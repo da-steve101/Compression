@@ -524,7 +524,7 @@ if __name__ == "__main__":
 
         return magnitude_layers_sorted, normalized_sums
 
-    cnn = load_model('cnn_binarized.save', cnn)
+    #cnn = load_model('cnn_binarized.save', cnn)
 
     params_binary = lasagne.layers.get_all_param_values(cnn, binary=True)
     params = lasagne.layers.get_all_params(cnn)
@@ -577,42 +577,23 @@ if __name__ == "__main__":
                         param_values[p+3] = np.delete(param_values[p+3], i-j,1)
                         param_values[p+4] = np.delete(param_values[p+4], i-j,1)
                         param_values[p+5] = np.delete(param_values[p+5], i-j,1)
-                        param_values[p+6] = np.delete(param_values[p+6], [(e-j),(e-j)+1,(e-j)+2,(e-j)+3,(e-j)+4,(e-j)+5,(e-j)+6,(e-j)+7,(e-j)+8,(e-j)+9,(e-j)+10,(e-j)+11,(e-j)+12,(e-j)+13,(e-j)+14,(e-j)+15] ,0)
-                        print(len(param_values[p+6]))
+                        param_values[p+6] = np.delete(param_values[p+6], [(e-(16*j)),(e-(16*j))+1,(e-(16*j))+2,(e-(16*j))+3,(e-(16*j))+4,(e-(16*j))+5,(e-(16*j))+6,(e-(16*j))+7,(e-(16*j))+8,(e-(16*j))+9,(e-(16*j))+10,(e-(16*j))+11,(e-(16*j))+12,(e-(16*j))+13,(e-(16*j))+14,(e-(16*j))+15] ,0)
+                        print(len(param_values[p+6]), e, j)
                     j+=1
 
             new_filter_sizes.append(param_values[p].shape[0])
 
         return param_values, new_filter_sizes
 
-    params_binary, filter_sizes = random_pruning(params, param_values,0.65)
+    new_param_values, filter_sizes = random_pruning(params, param_values,0.65)
 
     #np.set_printoptions(threshold=np.inf)
 
-    #replace parameters values with new pruned values
-    # j=0
-    # q=0
-    # for i in params:
-    #     if (str(i) == 'W'):
-    #         param_values[j] = params_binary[q]
-    #         q+=1
-    #     j+=1
+    cnn_pruned = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
 
-    #cnn_pruned = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
-
-    #params = lasagne.layers.get_all_param_values(cnn_pruned)
-
-    for i in params_binary:
-        print(i.shape)
-
-
-    #lasagne.layers.set_all_param_values(cnn_pruned, param_values)
+    lasagne.layers.set_all_param_values(cnn_pruned, new_param_values)
 
     
-
-
-
-
     #calculate x-axis in terms of index percentages
     xax = []
     xaxis = []
