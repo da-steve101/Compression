@@ -31,6 +31,7 @@ import theano
 import theano.tensor as T
 
 import lasagne
+import cPickle
 
 import cPickle as pickle
 import gzip
@@ -40,6 +41,10 @@ import binary_connect
 
 from pylearn2.datasets.zca_dataset import ZCA_Dataset    
 from pylearn2.utils import serial
+
+import matplotlib.pyplot as plt
+import csv
+import pylab
 
 from collections import OrderedDict
 
@@ -98,8 +103,8 @@ if __name__ == "__main__":
     #     preprocessed_dataset= serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/test.pkl"), 
     #     preprocessor = preprocessor)
         
-    # bc01 format
-    # print train_set.X.shape
+    # # bc01 format
+    # # print train_set.X.shape
     # train_set.X = train_set.X.reshape(-1,3,32,32)
     # valid_set.X = valid_set.X.reshape(-1,3,32,32)
     # test_set.X = test_set.X.reshape(-1,3,32,32)
@@ -126,168 +131,176 @@ if __name__ == "__main__":
     target = T.matrix('targets')
     LR = T.scalar('LR', dtype=theano.config.floatX)
 
-    cnn = lasagne.layers.InputLayer(
-            shape=(None, 3, 32, 32),
-            input_var=input)
-    
-    # 128C3-128C3-P2             
-    cnn = binary_connect.Conv2DLayer(
-            cnn, 
-            binary=binary,
-            stochastic=stochastic,
-            H=H,
-            W_LR_scale=W_LR_scale,
-            num_filters=128, 
-            filter_size=(3, 3),
-            pad=1,
-            nonlinearity=lasagne.nonlinearities.identity)
-    
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.rectify) 
-            
-    cnn = binary_connect.Conv2DLayer(
-            cnn, 
-            binary=binary,
-            stochastic=stochastic,
-            H=H,
-            W_LR_scale=W_LR_scale,
-            num_filters=128, 
-            filter_size=(3, 3),
-            pad=1,
-            nonlinearity=lasagne.nonlinearities.identity)
-    
-    cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-    
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.rectify)
-            
-    # 256C3-256C3-P2             
-    cnn = binary_connect.Conv2DLayer(
-            cnn, 
-            binary=binary,
-            stochastic=stochastic,
-            H=H,
-            W_LR_scale=W_LR_scale,
-            num_filters=256, 
-            filter_size=(3, 3),
-            pad=1,
-            nonlinearity=lasagne.nonlinearities.identity)
-    
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.rectify)
-            
-    cnn = binary_connect.Conv2DLayer(
-            cnn, 
-            binary=binary,
-            stochastic=stochastic,
-            H=H,
-            W_LR_scale=W_LR_scale,
-            num_filters=256, 
-            filter_size=(3, 3),
-            pad=1,
-            nonlinearity=lasagne.nonlinearities.identity)
-    
-    cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-    
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.rectify)
-            
-    # 512C3-512C3-P2              
-    cnn = binary_connect.Conv2DLayer(
-            cnn, 
-            binary=binary,
-            stochastic=stochastic,
-            H=H,
-            W_LR_scale=W_LR_scale,
-            num_filters=512, 
-            filter_size=(3, 3),
-            pad=1,
-            nonlinearity=lasagne.nonlinearities.identity)
-    
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.rectify)
-                  
-    cnn = binary_connect.Conv2DLayer(
-            cnn, 
-            binary=binary,
-            stochastic=stochastic,
-            H=H,
-            W_LR_scale=W_LR_scale,
-            num_filters=512, 
-            filter_size=(3, 3),
-            pad=1,
-            nonlinearity=lasagne.nonlinearities.identity)
-    
-    cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-    
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.rectify)
-    
-    # print(cnn.output_shape)
-    
-    # 1024FP-1024FP-10FP            
-    cnn = binary_connect.DenseLayer(
+    def build_model(numfilters1, numfilters2, numfilters3, numfilters4, numfilters5, numfilters6):
+
+
+        cnn = lasagne.layers.InputLayer(
+                shape=(None, 3, 32, 32),
+                input_var=input)
+        
+        # 128C3-128C3-P2             
+        cnn = binary_connect.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
                 W_LR_scale=W_LR_scale,
-                nonlinearity=lasagne.nonlinearities.identity,
-                num_units=1024)      
-                  
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.rectify)
-            
-    cnn = binary_connect.DenseLayer(
+                num_filters=numfilters1, 
+                filter_size=(3, 3),
+                pad=1,
+                nonlinearity=lasagne.nonlinearities.identity)
+        
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.rectify) 
+                
+        cnn = binary_connect.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
                 W_LR_scale=W_LR_scale,
-                nonlinearity=lasagne.nonlinearities.identity,
-                num_units=1024)      
-                  
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.rectify)
-    
-    cnn = binary_connect.DenseLayer(
+                num_filters=numfilters2, 
+                filter_size=(3, 3),
+                pad=1,
+                nonlinearity=lasagne.nonlinearities.identity)
+        
+        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
+        
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.rectify)
+                
+        # 256C3-256C3-P2             
+        cnn = binary_connect.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
                 W_LR_scale=W_LR_scale,
-                nonlinearity=lasagne.nonlinearities.identity,
-                num_units=10)      
-                  
-    cnn = batch_norm.BatchNormLayer(
-            cnn,
-            epsilon=epsilon, 
-            alpha=alpha,
-            nonlinearity=lasagne.nonlinearities.identity)
+                num_filters=numfilters3, 
+                filter_size=(3, 3),
+                pad=1,
+                nonlinearity=lasagne.nonlinearities.identity)
+        
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.rectify)
+                
+        cnn = binary_connect.Conv2DLayer(
+                cnn, 
+                binary=binary,
+                stochastic=stochastic,
+                H=H,
+                W_LR_scale=W_LR_scale,
+                num_filters=numfilters4, 
+                filter_size=(3, 3),
+                pad=1,
+                nonlinearity=lasagne.nonlinearities.identity)
+        
+        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
+        
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.rectify)
+                
+        # 512C3-512C3-P2              
+        cnn = binary_connect.Conv2DLayer(
+                cnn, 
+                binary=binary,
+                stochastic=stochastic,
+                H=H,
+                W_LR_scale=W_LR_scale,
+                num_filters=numfilters5, 
+                filter_size=(3, 3),
+                pad=1,
+                nonlinearity=lasagne.nonlinearities.identity)
+        
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.rectify)
+                      
+        cnn = binary_connect.Conv2DLayer(
+                cnn, 
+                binary=binary,
+                stochastic=stochastic,
+                H=H,
+                W_LR_scale=W_LR_scale,
+                num_filters=numfilters6, 
+                filter_size=(3, 3),
+                pad=1,
+                nonlinearity=lasagne.nonlinearities.identity)
+        
+        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
+        
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.rectify)
+        
+        # print(cnn.output_shape)
+        
+        # 1024FP-1024FP-10FP            
+        cnn = binary_connect.DenseLayer(
+                    cnn, 
+                    binary=binary,
+                    stochastic=stochastic,
+                    H=H,
+                    W_LR_scale=W_LR_scale,
+                    nonlinearity=lasagne.nonlinearities.identity,
+                    num_units=1024)      
+                      
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.rectify)
+                
+        cnn = binary_connect.DenseLayer(
+                    cnn, 
+                    binary=binary,
+                    stochastic=stochastic,
+                    H=H,
+                    W_LR_scale=W_LR_scale,
+                    nonlinearity=lasagne.nonlinearities.identity,
+                    num_units=1024)      
+                      
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.rectify)
+        
+        cnn = binary_connect.DenseLayer(
+                    cnn, 
+                    binary=binary,
+                    stochastic=stochastic,
+                    H=H,
+                    W_LR_scale=W_LR_scale,
+                    nonlinearity=lasagne.nonlinearities.identity,
+                    num_units=10)      
+                      
+        cnn = batch_norm.BatchNormLayer(
+                cnn,
+                epsilon=epsilon, 
+                alpha=alpha,
+                nonlinearity=lasagne.nonlinearities.identity)
+        return cnn #, cnn1
+
+    cnn = build_model(128,128,256,256,512,512)
+
+
 
     train_output = lasagne.layers.get_output(cnn, deterministic=False)
     
@@ -323,25 +336,321 @@ if __name__ == "__main__":
 
     print('Training...')
     
-    #load model
+    #tester = lasagne.layers.get_output(cnn1, deterministic=True)
 
+    # tester_fn = theano.function([input], tester)
 
+    # ones = np.ones((1,3,32,32))
 
-    #sort filters by magnitudes
-
-    params = lasagne.layers.get_all_param_values(cnn, binary=True)
-
-    print(params)
-
-    #crop filter matrix 
-    #create new model with new number of filters
-    #retrain
-
-    # binary_connect.train(
+    # binary_net.train(
     #         train_fn,val_fn,
+    #         cnn,
     #         batch_size,
     #         LR_start,LR_decay,
     #         num_epochs,
     #         train_set.X,train_set.y,
     #         valid_set.X,valid_set.y,
-    #         test_set.X,test_set.y)
+    #         test_set.X,test_set.y,
+    #         shuffle_parts=shuffle_parts)
+
+    #load trained model
+    def load_model(filename, model):
+        f = open(str(filename), 'rb')
+        loadedobj = cPickle.load(f)
+        lasagne.layers.set_all_param_values(model, loadedobj)
+        f.close()
+    
+        return model
+
+    #convert all real valued weights into ternary values
+    def ternarize_cnn(params, conv_thresh, fc_thresh):
+        #for cnn w/out BA, weight param indexes for conv and fc are 0,6,12,...,48
+        conv = [params[0],params[1], params[2], params[3], params[4], params[5]]
+        fc = [params[6], params[7], params[8]]
+        count = 0
+
+        for i in conv:
+            i = np.clip(i,-1., 1.)
+            i = np.select([i<-conv_thresh, i>conv_thresh, (-conv_thresh <= i) & (i <= conv_thresh)], [-1, 1 , 0])
+            i = i.astype(np.float32)
+            conv[count] = i
+            count += 1
+        count = 0
+        for j in fc:
+            j = np.clip(j,-1., 1.)
+            j = np.select([j<-fc_thresh, j>fc_thresh, (-fc_thresh <= j) & (j <= fc_thresh)], [-1, 1 , 0])
+            j = j.astype(np.float32)
+            fc[count] = j
+            count +=1
+
+        params_ternarized = conv + fc
+
+        return params_ternarized
+
+    def binarize_cnn(params):
+        conv = [params[0],params[1], params[2], params[3], params[4], params[5]]
+        fc = [params[6], params[7], params[8]]
+        count = 0
+
+        for i in conv:
+            i = np.clip((i+1.)/2.,0.,1.)
+            i = np.around(i)
+            i = np.select([i<1., i>0.], [-1., 1.])
+            i = i.astype(np.float32)
+            conv[count] = i
+            count += 1
+        count = 0
+
+        for j in fc:
+            j = np.clip((j+1.)/2.,0.,1.)
+            j = np.around(j)
+            j = np.select([j<1., j>0.], [-1., 1.])
+            j = j.astype(np.float32)
+            fc[count] = j
+            count +=1
+
+        params_ternarized = conv + fc
+
+        return params_ternarized
+
+    #count all preceding zeros for convolution layer
+    def count_zeros_conv(kernel, index1,index2,index3, index4):
+        #Enter filter kernel and its indexes from '.shape' = (index1,index2, index3,index4)
+        counter_pos = []
+        counter_neg = []
+        counter = []
+        count = 0
+        for k in range(index4):
+            for l in range(index3):
+                for i in range(index2):
+                    for j in range(index1):
+                        if (kernel[j][i][l][k] != 0.):
+                            counter.append(count)
+                            if (kernel[j][i][l][k] == 1.):
+                                counter_pos.append(count)
+                                count = 0
+                            elif (kernel[j][i][l][k] == -1.):
+                                counter_neg.append(count)
+                                count = 0
+                            else:  
+                                print("error")
+                        else:
+                            count += 1
+
+        data1 = Counter(counter_pos).most_common()
+        data2 = Counter(counter_neg).most_common() 
+        data3 = Counter(counter)
+        print(data3)
+        print(data1)
+        print(data2)
+
+    #calculate absolute sum of all kernels in each layer and return a list of magnitudes for each layer and its normalized version
+    def filter_magnitudes(layers):
+        conv = [layers[0],layers[1], layers[2], layers[3], layers[4], layers[5]]
+        magnitude = []
+        magnitude_layers = []
+        mag = 0
+
+        #calculate the absolute magnitudes of each kernel
+        for q in conv:
+            for k in range(q.shape[0]):
+                for l in range(q.shape[1]):
+                    for i in range(q.shape[2]):
+                        for j in range(q.shape[3]):
+                            mag += abs(q[k][l][i][j])
+                magnitude.append(mag)
+                mag = 0
+            magnitude_layers.append(magnitude)
+            magnitude = []
+
+        #calculate the normalized values and sort in descending order
+        abs_sum = []
+        tmp=[]
+        for r in magnitude_layers:
+            for y in range(len(r)):
+                r[y] = float(r[y])
+                s = r[y]/float(max(r))
+                tmp.append(s)
+            tmp = sorted(tmp, reverse=True)
+            abs_sum.append(tmp)
+            tmp = []
+
+        return magnitude_layers, abs_sum
+
+    #calculate the sum of quantized magnitudes of each kernel and then use the absolute value to see the kernel sums closest to zero.
+    #outputs the tuple: (absolute magnitudes, index filter number) and the normalized values in descending order
+    def filter_quantized_sum(layers):
+        conv = [layers[0],layers[1], layers[2], layers[3], layers[4], layers[5]]
+        magnitude = []
+        magnitude_layers = []
+        maximums = []
+        mag = 0
+
+        #calculate the sum of quantized magnitudes of each kernel and then use the absolute value to see the kerneal sums closes to zero
+        for q in conv:
+            for k in range(q.shape[0]):
+                for l in range(q.shape[1]):
+                    for i in range(q.shape[2]):
+                        for j in range(q.shape[3]):
+                            mag += q[k][l][i][j]
+                magnitude.append(abs(mag))
+                mag = 0
+            maximums.append(max(magnitude))
+            magnitude_layers.append(magnitude)
+            magnitude = []
+
+        #sort magnitudes in ascending order and make a tuple by adding their index number (value,index) 
+        # so that we know we cut off the first elements and then we have their indexes to know which parameters to remove from the cnn
+        for i in range(len(magnitude_layers)):
+            for j in range(len(magnitude_layers[i])):
+                magnitude_layers[i][j] = (magnitude_layers[i][j], j)
+
+        magnitude_layers_sorted = []
+        for i in magnitude_layers:
+            tmp = sorted(i, key=lambda tup: tup[0])
+            magnitude_layers_sorted.append(tmp)
+
+        #calculate the normalized values and sort in descending order (for the plots) where max value is the 
+        # maximum absolute value (i.e value furtherest from zero)
+        normalized_sums = []
+        tmp=[]
+        for r in range(len(magnitude_layers)):
+            for y in range(len(magnitude_layers[r])):
+                s = float(magnitude_layers[r][y][0])/float(maximums[r])
+                tmp.append(s)
+            tmp = sorted(tmp, reverse=True)
+            normalized_sums.append(tmp)
+            tmp = []
+
+        return magnitude_layers_sorted, normalized_sums
+
+    cnn = load_model('cnn_binarized.save', cnn)
+
+    params_binary = lasagne.layers.get_all_param_values(cnn, binary=True)
+    params = lasagne.layers.get_all_params(cnn)
+    param_values = lasagne.layers.get_all_param_values(cnn)
+
+    p = binarize_cnn(params_binary)
+
+    #mags1, normalized = filter_magnitudes(params)
+    mags1, normalized = filter_quantized_sum(p)
+
+    #randomly generate which filters will be pruned and output new list of params with dimensiond given by 'filter_sizes' output
+    def random_pruning(params, param_values,saved_filter_percentage):
+
+        filters = []
+        j=0
+        for i in params:
+            if (str(i) == 'W'):
+                filters.append(param_values[j].shape[0])
+            j+=1
+        #remove fc layer sizes
+        filters.pop()
+        filters.pop()
+        filters.pop()
+        print(filters)
+
+        random = []
+        new_filter_sizes = []
+
+        for i in range(len(filters)):
+            random.append(np.random.binomial(1,saved_filter_percentage, size=(1,filters[i]))[0])
+            #print(np.sum(random[i]))
+        print(len(random[5]))
+        print(random[5])
+
+        for p in xrange(0,(len(random)*6), 6):
+            j=0
+            for i in range(len(random[(int(float(p)/float(6)))])):
+                e = 16*i
+                if (random[(int(float(p)/float(6)))][i]==0):
+                    param_values[p] = np.delete(param_values[p], i-j,0)
+                    if (p<(len(filters)*5)):
+                        param_values[p+1] = np.delete(param_values[p+1], i-j,0)
+                        param_values[p+2] = np.delete(param_values[p+2], i-j,1)
+                        param_values[p+3] = np.delete(param_values[p+3], i-j,1)
+                        param_values[p+4] = np.delete(param_values[p+4], i-j,1)
+                        param_values[p+5] = np.delete(param_values[p+5], i-j,1)
+                        param_values[p+6] = np.delete(param_values[p+6], i-j,1)
+                    elif (p == 30):
+                        param_values[p+1] = np.delete(param_values[p+1], i-j,0)
+                        param_values[p+2] = np.delete(param_values[p+2], i-j,1)
+                        param_values[p+3] = np.delete(param_values[p+3], i-j,1)
+                        param_values[p+4] = np.delete(param_values[p+4], i-j,1)
+                        param_values[p+5] = np.delete(param_values[p+5], i-j,1)
+                        param_values[p+6] = np.delete(param_values[p+6], [e,e+1,e+2,e+3,e+4,e+5,e+6,e+7,e+8,e+9,e+10,e+11,e+12,e+13,e+14,e+15] ,0)
+                    j+=1
+
+            new_filter_sizes.append(param_values[p].shape[0])
+
+        return param_values, new_filter_sizes
+
+    params_binary, filter_sizes = random_pruning(params, param_values,0.65)
+
+    #np.set_printoptions(threshold=np.inf)
+
+    #replace parameters values with new pruned values
+    # j=0
+    # q=0
+    # for i in params:
+    #     if (str(i) == 'W'):
+    #         param_values[j] = params_binary[q]
+    #         q+=1
+    #     j+=1
+
+    #cnn_pruned = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
+
+    #params = lasagne.layers.get_all_param_values(cnn_pruned)
+
+    for i in params_binary:
+        print(i.shape)
+
+
+    #lasagne.layers.set_all_param_values(cnn_pruned, param_values)
+
+    
+
+
+
+
+    #calculate x-axis in terms of index percentages
+    xax = []
+    xaxis = []
+
+    for i in range(len(normalized)):
+        for j in range(len(normalized[i])):
+            x = 100*(float(j)/float(len(normalized[i])))
+            xax.append(x)
+        xaxis.append(xax)
+        xax = []
+        normalized[i] = np.array(normalized[i])
+
+    #plot
+    do_plot = False
+    if do_plot == True:
+        plt.ylabel('filter quantized sum normalized')
+        plt.xlabel('Filter')
+        plt.legend()
+        pylab.plot(xaxis[0],normalized[0],'.r-', label='conv1')
+        pylab.plot(xaxis[1],normalized[1], '.b-', label='conv2')
+        pylab.plot(xaxis[2],normalized[2], '-m.', label='conv3')
+        pylab.plot(xaxis[3],normalized[3], '-g.', label='conv4')
+        pylab.plot(xaxis[4],normalized[4], '-c.', label='conv5')
+        pylab.plot(xaxis[5],normalized[5], '-k.', label='conv6')
+
+        pylab.legend(loc='upper right')
+        #plt.plot(x, s1, 'b-', label='hi', x, s2, 'g-')
+        plt.show()
+
+
+
+
+    # Change to Xilinx computer and use github
+    # Use counter function on sydney uni computer but change for loop to that you can count zeros in each filter
+    # Add this function using the same process
+    # After getting these statistics, try a mild pruning strategy of the filters and then retrain the network 
+
+    #find magnitude of each filter for each layer and sort it  
+
+
+
