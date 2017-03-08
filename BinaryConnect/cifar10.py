@@ -558,7 +558,6 @@ if __name__ == "__main__":
             #print(np.sum(random[i]))
         print(len(random[5]))
         print(random[5])
-
         for p in xrange(0,(len(random)*6), 6):
             j=0
             for i in range(len(random[(int(float(p)/float(6)))])):
@@ -578,7 +577,8 @@ if __name__ == "__main__":
                         param_values[p+3] = np.delete(param_values[p+3], i-j,1)
                         param_values[p+4] = np.delete(param_values[p+4], i-j,1)
                         param_values[p+5] = np.delete(param_values[p+5], i-j,1)
-                        param_values[p+6] = np.delete(param_values[p+6], [e,e+1,e+2,e+3,e+4,e+5,e+6,e+7,e+8,e+9,e+10,e+11,e+12,e+13,e+14,e+15] ,0)
+                        param_values[p+6] = np.delete(param_values[p+6], [(e-j),(e-j)+1,(e-j)+2,(e-j)+3,(e-j)+4,(e-j)+5,(e-j)+6,(e-j)+7,(e-j)+8,(e-j)+9,(e-j)+10,(e-j)+11,(e-j)+12,(e-j)+13,(e-j)+14,(e-j)+15] ,0)
+                        print(len(param_values[p+6]))
                     j+=1
 
             new_filter_sizes.append(param_values[p].shape[0])
