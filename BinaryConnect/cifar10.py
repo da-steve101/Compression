@@ -90,39 +90,39 @@ if __name__ == "__main__":
     
     print('Loading CIFAR-10 dataset...')
     
-    # preprocessor = serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/preprocessor.pkl")
-    # train_set = ZCA_Dataset(
-    #     preprocessed_dataset=serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/train.pkl"), 
-    #     preprocessor = preprocessor,
-    #     start=0, stop = train_set_size)
-    # valid_set = ZCA_Dataset(
-    #     preprocessed_dataset= serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/train.pkl"), 
-    #     preprocessor = preprocessor,
-    #     start=45000, stop = 50000)  
-    # test_set = ZCA_Dataset(
-    #     preprocessed_dataset= serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/test.pkl"), 
-    #     preprocessor = preprocessor)
+    preprocessor = serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/preprocessor.pkl")
+    train_set = ZCA_Dataset(
+        preprocessed_dataset=serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/train.pkl"), 
+        preprocessor = preprocessor,
+        start=0, stop = train_set_size)
+    valid_set = ZCA_Dataset(
+        preprocessed_dataset= serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/train.pkl"), 
+        preprocessor = preprocessor,
+        start=45000, stop = 50000)  
+    test_set = ZCA_Dataset(
+        preprocessed_dataset= serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/test.pkl"), 
+        preprocessor = preprocessor)
         
-    # # bc01 format
-    # # print train_set.X.shape
-    # train_set.X = train_set.X.reshape(-1,3,32,32)
-    # valid_set.X = valid_set.X.reshape(-1,3,32,32)
-    # test_set.X = test_set.X.reshape(-1,3,32,32)
+    # bc01 format
+    # print train_set.X.shape
+    train_set.X = train_set.X.reshape(-1,3,32,32)
+    valid_set.X = valid_set.X.reshape(-1,3,32,32)
+    test_set.X = test_set.X.reshape(-1,3,32,32)
     
-    # # flatten targets
-    # train_set.y = np.hstack(train_set.y)
-    # valid_set.y = np.hstack(valid_set.y)
-    # test_set.y = np.hstack(test_set.y)
+    # flatten targets
+    train_set.y = np.hstack(train_set.y)
+    valid_set.y = np.hstack(valid_set.y)
+    test_set.y = np.hstack(test_set.y)
     
-    # # Onehot the targets
-    # train_set.y = np.float32(np.eye(10)[train_set.y])    
-    # valid_set.y = np.float32(np.eye(10)[valid_set.y])
-    # test_set.y = np.float32(np.eye(10)[test_set.y])
+    # Onehot the targets
+    train_set.y = np.float32(np.eye(10)[train_set.y])    
+    valid_set.y = np.float32(np.eye(10)[valid_set.y])
+    test_set.y = np.float32(np.eye(10)[test_set.y])
     
-    # # for hinge loss
-    # train_set.y = 2* train_set.y - 1.
-    # valid_set.y = 2* valid_set.y - 1.
-    # test_set.y = 2* test_set.y - 1.
+    # for hinge loss
+    train_set.y = 2* train_set.y - 1.
+    valid_set.y = 2* valid_set.y - 1.
+    test_set.y = 2* test_set.y - 1.
 
     print('Building the CNN...') 
     
@@ -297,63 +297,7 @@ if __name__ == "__main__":
                 alpha=alpha,
                 nonlinearity=lasagne.nonlinearities.identity)
         return cnn #, cnn1
-
-    cnn = build_model(128,128,256,256,512,512)
-
-
-
-    train_output = lasagne.layers.get_output(cnn, deterministic=False)
-    
-    # squared hinge loss
-    loss = T.mean(T.sqr(T.maximum(0.,1.-target*train_output)))
-    
-    if binary:
-        
-        # W updates
-        W = lasagne.layers.get_all_params(cnn, binary=True)
-        W_grads = binary_connect.compute_grads(loss,cnn)
-        updates = lasagne.updates.adam(loss_or_grads=W_grads, params=W, learning_rate=LR)
-        updates = binary_connect.clipping_scaling(updates,cnn)
-        
-        # other parameters updates
-        params = lasagne.layers.get_all_params(cnn, trainable=True, binary=False)
-        updates = OrderedDict(updates.items() + lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR).items())
-        
-    else:
-        params = lasagne.layers.get_all_params(cnn, trainable=True)
-        updates = lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR)
-
-    test_output = lasagne.layers.get_output(cnn, deterministic=True)
-    test_loss = T.mean(T.sqr(T.maximum(0.,1.-target*test_output)))
-    test_err = T.mean(T.neq(T.argmax(test_output, axis=1), T.argmax(target, axis=1)),dtype=theano.config.floatX)
-    
-    # Compile a function performing a training step on a mini-batch (by giving the updates dictionary) 
-    # and returning the corresponding training loss:
-    train_fn = theano.function([input, target, LR], loss, updates=updates)
-
-    # Compile a second function computing the validation loss and accuracy:
-    val_fn = theano.function([input, target], [test_loss, test_err])
-
-    print('Training...')
-    
-    #tester = lasagne.layers.get_output(cnn1, deterministic=True)
-
-    # tester_fn = theano.function([input], tester)
-
-    # ones = np.ones((1,3,32,32))
-
-    # binary_net.train(
-    #         train_fn,val_fn,
-    #         cnn,
-    #         batch_size,
-    #         LR_start,LR_decay,
-    #         num_epochs,
-    #         train_set.X,train_set.y,
-    #         valid_set.X,valid_set.y,
-    #         test_set.X,test_set.y,
-    #         shuffle_parts=shuffle_parts)
-
-    #load trained model
+     #load trained model
     def load_model(filename, model):
         f = open(str(filename), 'rb')
         loadedobj = cPickle.load(f)
@@ -524,17 +468,6 @@ if __name__ == "__main__":
 
         return magnitude_layers_sorted, normalized_sums
 
-    #cnn = load_model('cnn_binarized.save', cnn)
-
-    params_binary = lasagne.layers.get_all_param_values(cnn, binary=True)
-    params = lasagne.layers.get_all_params(cnn)
-    param_values = lasagne.layers.get_all_param_values(cnn)
-
-    p = binarize_cnn(params_binary)
-
-    #mags1, normalized = filter_magnitudes(params)
-    mags1, normalized = filter_quantized_sum(p)
-
     #randomly generate which filters will be pruned and output new list of params with dimensiond given by 'filter_sizes' output
     def random_pruning(params, param_values,saved_filter_percentage):
 
@@ -548,7 +481,6 @@ if __name__ == "__main__":
         filters.pop()
         filters.pop()
         filters.pop()
-        print(filters)
 
         random = []
         new_filter_sizes = []
@@ -556,8 +488,6 @@ if __name__ == "__main__":
         for i in range(len(filters)):
             random.append(np.random.binomial(1,saved_filter_percentage, size=(1,filters[i]))[0])
             #print(np.sum(random[i]))
-        print(len(random[5]))
-        print(random[5])
         for p in xrange(0,(len(random)*6), 6):
             j=0
             for i in range(len(random[(int(float(p)/float(6)))])):
@@ -578,37 +508,99 @@ if __name__ == "__main__":
                         param_values[p+4] = np.delete(param_values[p+4], i-j,1)
                         param_values[p+5] = np.delete(param_values[p+5], i-j,1)
                         param_values[p+6] = np.delete(param_values[p+6], [(e-(16*j)),(e-(16*j))+1,(e-(16*j))+2,(e-(16*j))+3,(e-(16*j))+4,(e-(16*j))+5,(e-(16*j))+6,(e-(16*j))+7,(e-(16*j))+8,(e-(16*j))+9,(e-(16*j))+10,(e-(16*j))+11,(e-(16*j))+12,(e-(16*j))+13,(e-(16*j))+14,(e-(16*j))+15] ,0)
-                        print(len(param_values[p+6]), e, j)
                     j+=1
 
             new_filter_sizes.append(param_values[p].shape[0])
 
         return param_values, new_filter_sizes
 
+    cnn = build_model(128,128,256,256,512,512)
+
+    print('Training...')
+    
+    #tester = lasagne.layers.get_output(cnn1, deterministic=True)
+
+    # tester_fn = theano.function([input], tester)
+
+    # ones = np.ones((1,3,32,32))
+
+
+    # cnn = load_model('../../../../BinaryConnect/cnn_binarized.save', cnn)
+    cnn = load_model('/home/jfar0131/job3/BinaryConnect/cnn_binarized.save', cnn)
+
+    params_binary = lasagne.layers.get_all_param_values(cnn, binary=True)
+    params = lasagne.layers.get_all_params(cnn)
+    param_values = lasagne.layers.get_all_param_values(cnn)
+
+    p = binarize_cnn(params_binary)
+
+    #mags1, normalized = filter_magnitudes(params)
+    mags1, normalized = filter_quantized_sum(p)
     new_param_values, filter_sizes = random_pruning(params, param_values,0.65)
 
     #np.set_printoptions(threshold=np.inf)
 
     cnn_pruned = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
 
+    train_output = lasagne.layers.get_output(cnn_pruned, deterministic=False)
+    # squared hinge loss
+    loss = T.mean(T.sqr(T.maximum(0.,1.-target*train_output)))
+    
+    if binary:
+        
+        # W updates
+        W = lasagne.layers.get_all_params(cnn_pruned, binary=True)
+        W_grads = binary_connect.compute_grads(loss,cnn_pruned)
+        updates = lasagne.updates.adam(loss_or_grads=W_grads, params=W, learning_rate=LR)
+        updates = binary_connect.clipping_scaling(updates,cnn_pruned)
+        
+        # other parameters updates
+        params = lasagne.layers.get_all_params(cnn_pruned, trainable=True, binary=False)
+        updates = OrderedDict(updates.items() + lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR).items())
+        
+    else:
+        params = lasagne.layers.get_all_params(cnn_pruned, trainable=True)
+        updates = lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR)
+
+    test_output = lasagne.layers.get_output(cnn_pruned, deterministic=True)
+    test_loss = T.mean(T.sqr(T.maximum(0.,1.-target*test_output)))
+    test_err = T.mean(T.neq(T.argmax(test_output, axis=1), T.argmax(target, axis=1)),dtype=theano.config.floatX)
+    
+    # Compile a function performing a training step on a mini-batch (by giving the updates dictionary) 
+    # and returning the corresponding training loss:
+    train_fn = theano.function([input, target, LR], loss, updates=updates)
+
+    # Compile a second function computing the validation loss and accuracy:
+    val_fn = theano.function([input, target], [test_loss, test_err])
+
     lasagne.layers.set_all_param_values(cnn_pruned, new_param_values)
 
+    binary_connect.train(
+            train_fn,val_fn,
+            batch_size,
+            LR_start,LR_decay,
+            num_epochs,
+            train_set.X,train_set.y,
+            valid_set.X,valid_set.y,cnn_pruned,
+            test_set.X,test_set.y)
+
     
-    #calculate x-axis in terms of index percentages
-    xax = []
-    xaxis = []
-
-    for i in range(len(normalized)):
-        for j in range(len(normalized[i])):
-            x = 100*(float(j)/float(len(normalized[i])))
-            xax.append(x)
-        xaxis.append(xax)
-        xax = []
-        normalized[i] = np.array(normalized[i])
-
     #plot
     do_plot = False
     if do_plot == True:
+        #calculate x-axis in terms of index percentages
+        xax = []
+        xaxis = []
+
+        for i in range(len(normalized)):
+            for j in range(len(normalized[i])):
+                x = 100*(float(j)/float(len(normalized[i])))
+                xax.append(x)
+            xaxis.append(xax)
+            xax = []
+            normalized[i] = np.array(normalized[i])
+
+    
         plt.ylabel('filter quantized sum normalized')
         plt.xlabel('Filter')
         plt.legend()
