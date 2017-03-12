@@ -1,19 +1,3 @@
-# Copyright 2015 Matthieu Courbariaux
-
-# This file is part of BinaryConnect.
-
-# BinaryConnect is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# BinaryConnect is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with BinaryConnect.  If not, see <http://www.gnu.org/licenses/>.
 
 import time
 
@@ -31,10 +15,39 @@ import lasagne
 
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
+from theano.scalar.basic import UnaryScalarOp, same_out_nocomplex
+from theano.tensor.elemwise import Elemwise
+
+# Our own rounding function, that does not set the gradient to 0 like Theano's
+class Round3(UnaryScalarOp):
+    
+    def c_code(self, node, name, (x,), (z,), sub):
+        return "%(z)s = round(%(x)s);" % locals()
+    
+    def grad(self, inputs, gout):
+        (gz,) = gout
+        return gz, 
+        
+round3_scalar = Round3(same_out_nocomplex, name='round3')
+round3 = Elemwise(round3_scalar)
+
 def hard_sigmoid(x):
     return T.clip((x+1.)/2.,0,1)
 
-# The binarization function
+# The neurons' activations binarization function
+# It behaves like the sign function during forward propagation
+# And like:
+#   hard_tanh(x) = 2*hard_sigmoid(x)-1 
+# during back propagation
+def binary_tanh_unit(x):
+    return 2.*round3(hard_sigmoid(x))-1.
+    
+def binary_sigmoid_unit(x):
+    return round3(hard_sigmoid(x))
+    
+# The weights' binarization function, 
+# taken directly from the BinaryConnect github repository 
+# (which was made available by his authors)
 def binarization(W,H,binary=True,deterministic=False,stochastic=False,srng=None):
     
     # (deterministic == True) <-> test-time <-> inference-time
@@ -46,6 +59,7 @@ def binarization(W,H,binary=True,deterministic=False,stochastic=False,srng=None)
         
         # [-1,1] -> [0,1]
         Wb = hard_sigmoid(W/H)
+        # Wb = T.clip(W/H,-1,1)
         
         # Stochastic BinaryConnect
         if stochastic:
@@ -182,31 +196,55 @@ def clipping_scaling(updates,network):
     return updates
         
 # Given a dataset and a model, this function trains the model on the dataset for several epochs
-# (There is no default train function in Lasagne yet)
+# (There is no default trainer function in Lasagne yet)
 def train(train_fn,val_fn,
+            model, percentage_prune, pruning_type,
             batch_size,
             LR_start,LR_decay,
             num_epochs,
             X_train,y_train,
-            X_val,y_val,cnn_pruned, percentage_prune, pruning_type,
-            X_test,y_test):
+            X_val,y_val,
+            X_test,y_test,
+            save_path=None,
+            shuffle_parts=1):
     
     # A function which shuffles a dataset
     def shuffle(X,y):
-    
-        shuffled_range = range(len(X))
-        np.random.shuffle(shuffled_range)
-        # print(shuffled_range[0:10])
         
-        new_X = np.copy(X)
-        new_y = np.copy(y)
+        # print(len(X))
         
-        for i in range(len(X)):
+        chunk_size = len(X)/shuffle_parts
+        shuffled_range = range(chunk_size)
+        
+        X_buffer = np.copy(X[0:chunk_size])
+        y_buffer = np.copy(y[0:chunk_size])
+        
+        for k in range(shuffle_parts):
             
-            new_X[i] = X[shuffled_range[i]]
-            new_y[i] = y[shuffled_range[i]]
+            np.random.shuffle(shuffled_range)
+
+            for i in range(chunk_size):
+                
+                X_buffer[i] = X[k*chunk_size+shuffled_range[i]]
+                y_buffer[i] = y[k*chunk_size+shuffled_range[i]]
             
-        return new_X,new_y
+            X[k*chunk_size:(k+1)*chunk_size] = X_buffer
+            y[k*chunk_size:(k+1)*chunk_size] = y_buffer
+        
+        return X,y
+        
+        # shuffled_range = range(len(X))
+        # np.random.shuffle(shuffled_range)
+        
+        # new_X = np.copy(X)
+        # new_y = np.copy(y)
+        
+        # for i in range(len(X)):
+            
+            # new_X[i] = X[shuffled_range[i]]
+            # new_y[i] = y[shuffled_range[i]]
+            
+        # return new_X,new_y
     
     # This function trains the model a full epoch (on the whole dataset)
     def train_epoch(X,y,LR):
@@ -262,7 +300,7 @@ def train(train_fn,val_fn,
             
             test_err, test_loss = val_epoch(X_test,y_test)
 
-            f = open('cnn_binarized_'+ str(str(pruning_percentage).replace(".","")) + '_' + str(pruning_type)+'.save', 'wb')
+            f = open('cnnBA_binarized_'+ str(str(percentage_prune).replace(".","")) + '_' + str(pruning_type)+'.save', 'wb')
             cPickle.dump(lasagne.layers.get_all_param_values(model), f, protocol=cPickle.HIGHEST_PROTOCOL)
             f.close()
         

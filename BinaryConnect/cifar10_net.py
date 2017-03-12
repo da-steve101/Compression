@@ -1,19 +1,3 @@
-# Copyright 2015 Matthieu Courbariaux
-
-# This file is part of BinaryConnect.
-
-# BinaryConnect is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-
-# BinaryConnect is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-
-# You should have received a copy of the GNU General Public License
-# along with BinaryConnect.  If not, see <http://www.gnu.org/licenses/>.
 
 from __future__ import print_function
 
@@ -31,25 +15,21 @@ import theano
 import theano.tensor as T
 
 import lasagne
-import cPickle
 
 import cPickle as pickle
 import gzip
 
-import batch_norm
-import binary_connect
+import binary_net
+#sys.path.append('../../BinaryConnect/')
 import compress
 
-from pylearn2.datasets.zca_dataset import ZCA_Dataset
+from pylearn2.datasets.zca_dataset import ZCA_Dataset   
+from pylearn2.datasets.cifar10 import CIFAR10 
 from pylearn2.utils import serial
-
-import matplotlib.pyplot as plt
-import csv
-import pylab
 
 from collections import OrderedDict
 
-import getopt
+import sys, getopt
 
 def main(argv):
    percentage_prune = ''
@@ -58,11 +38,11 @@ def main(argv):
    try:
       opts, args = getopt.getopt(argv,"hp:t:",["percprune=","pruntype="])
    except getopt.GetoptError:
-      print('cifar10.py -pp <percentage_prune> -pt <prune_type>')
+      print('cifar10_net.py -pp <percentage_prune> -pt <prune_type>')
       sys.exit(2)
    for opt, arg in opts:
       if opt == '-h':
-         print('cifar10.py -pp <percentage_prune> -pt <prune_type>')
+         print('cifar10_net.py -pp <percentage_prune> -pt <prune_type>')
          sys.exit()
       elif opt in ("-p", "--percprune"):
         print("hi")
@@ -78,7 +58,9 @@ if __name__ == "__main__":
 
     percentage_prune, pruning_type = main(sys.argv[1:])
 
-    network_type = 'binaryconnect'
+    print('cnnBA_binarized_'+ str(str(percentage_prune).replace(".","")) + '_' + str(pruning_type)+'.save')
+
+    network_type = 'binarynet'
     # BN parameters
     batch_size = 50
     print("batch_size = "+str(batch_size))
@@ -88,9 +70,11 @@ if __name__ == "__main__":
     epsilon = 1e-4
     print("epsilon = "+str(epsilon))
     
-    # Training parameters
-    num_epochs = 500
-    print("num_epochs = "+str(num_epochs))
+    # BinaryOut
+    activation = binary_net.binary_tanh_unit
+    print("activation = binary_net.binary_tanh_unit")
+    # activation = binary_net.binary_sigmoid_unit
+    # print("activation = binary_net.binary_sigmoid_unit")
     
     # BinaryConnect    
     binary = True
@@ -105,10 +89,14 @@ if __name__ == "__main__":
     W_LR_scale = "Glorot" # "Glorot" means we are using the coefficients from Glorot's paper
     print("W_LR_scale = "+str(W_LR_scale))
     
+    # Training parameters
+    num_epochs = 500
+    print("num_epochs = "+str(num_epochs))
+    
     # Decaying LR 
-    LR_start = 0.003
+    LR_start = 0.001
     print("LR_start = "+str(LR_start))
-    LR_fin = 0.000002
+    LR_fin = 0.0000003
     print("LR_fin = "+str(LR_fin))
     LR_decay = (LR_fin/LR_start)**(1./num_epochs)
     print("LR_decay = "+str(LR_decay))
@@ -116,28 +104,23 @@ if __name__ == "__main__":
     
     train_set_size = 45000
     print("train_set_size = "+str(train_set_size))
+    shuffle_parts = 1
+    print("shuffle_parts = "+str(shuffle_parts))
     
     print('Loading CIFAR-10 dataset...')
+    
     train = False
     if train == True:
-        preprocessor = serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/preprocessor.pkl")
-        train_set = ZCA_Dataset(
-            preprocessed_dataset=serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/train.pkl"), 
-            preprocessor = preprocessor,
-            start=0, stop = train_set_size)
-        valid_set = ZCA_Dataset(
-            preprocessed_dataset= serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/train.pkl"), 
-            preprocessor = preprocessor,
-            start=45000, stop = 50000)  
-        test_set = ZCA_Dataset(
-            preprocessed_dataset= serial.load("${PYLEARN2_DATA_PATH}/cifar10/pylearn2_gcn_whitened/test.pkl"), 
-            preprocessor = preprocessor)
+        train_set = CIFAR10(which_set="train",start=0,stop = train_set_size)
+        valid_set = CIFAR10(which_set="train",start=train_set_size,stop = 50000)
+        test_set = CIFAR10(which_set="test")
             
         # bc01 format
-        # print train_set.X.shape
-        train_set.X = train_set.X.reshape(-1,3,32,32)
-        valid_set.X = valid_set.X.reshape(-1,3,32,32)
-        test_set.X = test_set.X.reshape(-1,3,32,32)
+        # Inputs in the range [-1,+1]
+        # print("Inputs in the range [-1,+1]")
+        train_set.X = np.reshape(np.subtract(np.multiply(2./255.,train_set.X),1.),(-1,3,32,32))
+        valid_set.X = np.reshape(np.subtract(np.multiply(2./255.,valid_set.X),1.),(-1,3,32,32))
+        test_set.X = np.reshape(np.subtract(np.multiply(2./255.,test_set.X),1.),(-1,3,32,32))
         
         # flatten targets
         train_set.y = np.hstack(train_set.y)
@@ -160,16 +143,14 @@ if __name__ == "__main__":
     input = T.tensor4('inputs')
     target = T.matrix('targets')
     LR = T.scalar('LR', dtype=theano.config.floatX)
-    
+
     def build_model(numfilters1, numfilters2, numfilters3, numfilters4, numfilters5, numfilters6):
-
-
         cnn = lasagne.layers.InputLayer(
-                shape=(None, 3, 32, 32),
-                input_var=input)
-        
+            shape=(None, 3, 32, 32),
+            input_var=input)
+    
         # 128C3-128C3-P2             
-        cnn = binary_connect.Conv2DLayer(
+        cnn = binary_net.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
@@ -180,13 +161,16 @@ if __name__ == "__main__":
                 pad=1,
                 nonlinearity=lasagne.nonlinearities.identity)
         
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.rectify) 
+                alpha=alpha)
+                    
+        cnn = lasagne.layers.NonlinearityLayer(
+                cnn,
+                nonlinearity=activation) 
                 
-        cnn = binary_connect.Conv2DLayer(
+        cnn = binary_net.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
@@ -199,14 +183,17 @@ if __name__ == "__main__":
         
         cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
         
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.rectify)
+                alpha=alpha)
+                    
+        cnn = lasagne.layers.NonlinearityLayer(
+                cnn,
+                nonlinearity=activation) 
                 
         # 256C3-256C3-P2             
-        cnn = binary_connect.Conv2DLayer(
+        cnn = binary_net.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
@@ -217,13 +204,16 @@ if __name__ == "__main__":
                 pad=1,
                 nonlinearity=lasagne.nonlinearities.identity)
         
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.rectify)
+                alpha=alpha)
+                    
+        cnn = lasagne.layers.NonlinearityLayer(
+                cnn,
+                nonlinearity=activation) 
                 
-        cnn = binary_connect.Conv2DLayer(
+        cnn = binary_net.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
@@ -236,14 +226,17 @@ if __name__ == "__main__":
         
         cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
         
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.rectify)
+                alpha=alpha)
+                    
+        cnn = lasagne.layers.NonlinearityLayer(
+                cnn,
+                nonlinearity=activation) 
                 
         # 512C3-512C3-P2              
-        cnn = binary_connect.Conv2DLayer(
+        cnn = binary_net.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
@@ -254,13 +247,16 @@ if __name__ == "__main__":
                 pad=1,
                 nonlinearity=lasagne.nonlinearities.identity)
         
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.rectify)
+                alpha=alpha)
+                    
+        cnn = lasagne.layers.NonlinearityLayer(
+                cnn,
+                nonlinearity=activation) 
                       
-        cnn = binary_connect.Conv2DLayer(
+        cnn = binary_net.Conv2DLayer(
                 cnn, 
                 binary=binary,
                 stochastic=stochastic,
@@ -273,16 +269,19 @@ if __name__ == "__main__":
         
         cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
         
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.rectify)
+                alpha=alpha)
+                    
+        cnn = lasagne.layers.NonlinearityLayer(
+                cnn,
+                nonlinearity=activation) 
         
         # print(cnn.output_shape)
         
         # 1024FP-1024FP-10FP            
-        cnn = binary_connect.DenseLayer(
+        cnn = binary_net.DenseLayer(
                     cnn, 
                     binary=binary,
                     stochastic=stochastic,
@@ -291,13 +290,16 @@ if __name__ == "__main__":
                     nonlinearity=lasagne.nonlinearities.identity,
                     num_units=1024)      
                       
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.rectify)
+                alpha=alpha)
+                    
+        cnn = lasagne.layers.NonlinearityLayer(
+                cnn,
+                nonlinearity=activation) 
                 
-        cnn = binary_connect.DenseLayer(
+        cnn = binary_net.DenseLayer(
                     cnn, 
                     binary=binary,
                     stochastic=stochastic,
@@ -306,13 +308,16 @@ if __name__ == "__main__":
                     nonlinearity=lasagne.nonlinearities.identity,
                     num_units=1024)      
                       
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.rectify)
+                alpha=alpha)
+                    
+        cnn = lasagne.layers.NonlinearityLayer(
+                cnn,
+                nonlinearity=activation) 
         
-        cnn = binary_connect.DenseLayer(
+        cnn = binary_net.DenseLayer(
                     cnn, 
                     binary=binary,
                     stochastic=stochastic,
@@ -321,28 +326,22 @@ if __name__ == "__main__":
                     nonlinearity=lasagne.nonlinearities.identity,
                     num_units=10)      
                       
-        cnn = batch_norm.BatchNormLayer(
+        cnn = lasagne.layers.BatchNormLayer(
                 cnn,
                 epsilon=epsilon, 
-                alpha=alpha,
-                nonlinearity=lasagne.nonlinearities.identity)
-        return cnn #, cnn1
-     #load trained model
+                alpha=alpha)
+
+        return cnn
 
     cnn = build_model(128,128,256,256,512,512)
 
-    #tester = lasagne.layers.get_output(cnn1, deterministic=True)
-    # tester_fn = theano.function([input], tester)
-    # ones = np.ones((1,3,32,32))
-    
-
-    # cnn = load_model('../../../../BinaryConnect/cnn_binarized.save', cnn)
-    #cnn = load_model('/home/jfar0131/job3/BinaryConnect/cnn_binarized.save', cnn)
+    if train == True:
+        cnn = load_model('/home/jfar0131/job3/BinaryConnect/cnnBA_binarized.save', cnn)
 
     params_binary = lasagne.layers.get_all_param_values(cnn, binary=True)
     params = lasagne.layers.get_all_params(cnn)
     param_values = lasagne.layers.get_all_param_values(cnn)
-    
+
     if pruning_type == 'random':
         new_param_values, filter_sizes = compress.random_pruning(params_binary, param_values,float(percentage_prune), network_type)
     elif pruning_type == 'quantization':
@@ -350,29 +349,30 @@ if __name__ == "__main__":
     elif pruning_type == 'real':
         new_param_values, filter_sizes = compress.real_weights_pruning(params_binary, param_values,float(percentage_prune), network_type)
 
+
     cnn_pruned = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
 
-    train_output = lasagne.layers.get_output(cnn_pruned, deterministic=False)
+    train_output = lasagne.layers.get_output(cnn, deterministic=False)
     # squared hinge loss
     loss = T.mean(T.sqr(T.maximum(0.,1.-target*train_output)))
     
     if binary:
         
         # W updates
-        W = lasagne.layers.get_all_params(cnn_pruned, binary=True)
-        W_grads = binary_connect.compute_grads(loss,cnn_pruned)
+        W = lasagne.layers.get_all_params(cnn, binary=True)
+        W_grads = binary_net.compute_grads(loss,cnn)
         updates = lasagne.updates.adam(loss_or_grads=W_grads, params=W, learning_rate=LR)
-        updates = binary_connect.clipping_scaling(updates,cnn_pruned)
+        updates = binary_net.clipping_scaling(updates,cnn)
         
         # other parameters updates
-        params = lasagne.layers.get_all_params(cnn_pruned, trainable=True, binary=False)
+        params = lasagne.layers.get_all_params(cnn, trainable=True, binary=False)
         updates = OrderedDict(updates.items() + lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR).items())
         
     else:
-        params = lasagne.layers.get_all_params(cnn_pruned, trainable=True)
+        params = lasagne.layers.get_all_params(cnn, trainable=True)
         updates = lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR)
 
-    test_output = lasagne.layers.get_output(cnn_pruned, deterministic=True)
+    test_output = lasagne.layers.get_output(cnn, deterministic=True)
     test_loss = T.mean(T.sqr(T.maximum(0.,1.-target*test_output)))
     test_err = T.mean(T.neq(T.argmax(test_output, axis=1), T.argmax(target, axis=1)),dtype=theano.config.floatX)
     
@@ -385,48 +385,16 @@ if __name__ == "__main__":
 
     lasagne.layers.set_all_param_values(cnn_pruned, new_param_values)
 
+    print('Training...')
+    
     if train == True:
-        print('Training...')
-        binary_connect.train(
+        binary_net.train(
                 train_fn,val_fn,
+                cnn, percentage_prune, pruning_type,
                 batch_size,
                 LR_start,LR_decay,
                 num_epochs,
                 train_set.X,train_set.y,
-                valid_set.X,valid_set.y,cnn_pruned, percentage_prune, pruning_type,
-                test_set.X,test_set.y)
-
-    
-    #plot
-    do_plot = False
-    if do_plot == True:
-        #calculate x-axis in terms of index percentages
-        xax = []
-        xaxis = []
-
-        for i in range(len(normalized)):
-            for j in range(len(normalized[i])):
-                x = 100*(float(j)/float(len(normalized[i])))
-                xax.append(x)
-            xaxis.append(xax)
-            xax = []
-            normalized[i] = np.array(normalized[i])
-
-    
-        plt.ylabel('filter quantized sum normalized')
-        plt.xlabel('Filter')
-        plt.legend()
-        pylab.plot(xaxis[0],normalized[0],'.r-', label='conv1')
-        pylab.plot(xaxis[1],normalized[1], '.b-', label='conv2')
-        pylab.plot(xaxis[2],normalized[2], '-m.', label='conv3')
-        pylab.plot(xaxis[3],normalized[3], '-g.', label='conv4')
-        pylab.plot(xaxis[4],normalized[4], '-c.', label='conv5')
-        pylab.plot(xaxis[5],normalized[5], '-k.', label='conv6')
-
-        pylab.legend(loc='upper right')
-        #plt.plot(x, s1, 'b-', label='hi', x, s2, 'g-')
-        plt.show()
-
-
-
-
+                valid_set.X,valid_set.y,
+                test_set.X,test_set.y,
+                shuffle_parts=shuffle_parts)

@@ -168,8 +168,13 @@ def filter_magnitudes(param_values_binary):
     return magnitude_layers, magnitude_layers_sorted, normalized_sum
 
 #After obtaining a binary matrix to determine which filters to prune, we use this to prune the corresponding input/output filters for the whole network
-def restructure_param_values(random, param_values, filters):
+def restructure_param_values(random, param_values, filters, network_type):
 	#for binarynet p+2 --> p+5 = 0, binaryconnect p+2 --> p+5 = 1.
+    if network_type == 'binarynet':
+        ax = 0
+    elif network_type == 'binaryconnect':
+        ax = 1
+
     for p in xrange(0,(len(random)*6), 6):
         j=0
         for i in range(len(random[(int(float(p)/float(6)))])):
@@ -178,17 +183,17 @@ def restructure_param_values(random, param_values, filters):
                 param_values[p] = np.delete(param_values[p], i-j,0)
                 if (p<(len(filters)*5)):
                 	param_values[p+1] = np.delete(param_values[p+1], i-j,0)
-                	param_values[p+2] = np.delete(param_values[p+2], i-j,0)
-                	param_values[p+3] = np.delete(param_values[p+3], i-j,0)
-                	param_values[p+4] = np.delete(param_values[p+4], i-j,0)
-                	param_values[p+5] = np.delete(param_values[p+5], i-j,0)
+                	param_values[p+2] = np.delete(param_values[p+2], i-j,ax)
+                	param_values[p+3] = np.delete(param_values[p+3], i-j,ax)
+                	param_values[p+4] = np.delete(param_values[p+4], i-j,ax)
+                	param_values[p+5] = np.delete(param_values[p+5], i-j,ax)
                 	param_values[p+6] = np.delete(param_values[p+6], i-j,1)
                 elif (p == 30):
                     param_values[p+1] = np.delete(param_values[p+1], i-j,0)
-                    param_values[p+2] = np.delete(param_values[p+2], i-j,0)
-                    param_values[p+3] = np.delete(param_values[p+3], i-j,0)
-                    param_values[p+4] = np.delete(param_values[p+4], i-j,0)
-                    param_values[p+5] = np.delete(param_values[p+5], i-j,0)
+                    param_values[p+2] = np.delete(param_values[p+2], i-j,ax)
+                    param_values[p+3] = np.delete(param_values[p+3], i-j,ax)
+                    param_values[p+4] = np.delete(param_values[p+4], i-j,ax)
+                    param_values[p+5] = np.delete(param_values[p+5], i-j,ax)
                     param_values[p+6] = np.delete(param_values[p+6], [(e-(16*j)),(e-(16*j))+1,(e-(16*j))+2,(e-(16*j))+3,(e-(16*j))+4,(e-(16*j))+5,(e-(16*j))+6,(e-(16*j))+7,(e-(16*j))+8,(e-(16*j))+9,(e-(16*j))+10,(e-(16*j))+11,(e-(16*j))+12,(e-(16*j))+13,(e-(16*j))+14,(e-(16*j))+15] ,0)
                 j+=1
         print(param_values[p].shape)
@@ -251,7 +256,7 @@ def filter_quantized_sum(quantized_params):
     return magnitude_layers, magnitude_layers_ascending, normalized_sums
 
 #randomly generate which filters will be pruned and output new list of params with dimensiond given by 'filter_sizes' output
-def random_pruning(param_values_binary, param_values,saved_filter_percentage):
+def random_pruning(param_values_binary, param_values,saved_filter_percentage, network_type):
 
     filters = []
     for i in param_values_binary:
@@ -278,12 +283,12 @@ def random_pruning(param_values_binary, param_values,saved_filter_percentage):
     for i in param_values:
     	print(i.shape)    
 
-    param_values = restructure_param_values(random, param_values, filters)
+    param_values = restructure_param_values(random, param_values, filters, network_type)
 
     return param_values, new_filter_sizes
 
 #prune filters which have the smallest absolute sum of the real-valued weights
-def real_weights_pruning(param_values_binary, param_values,saved_filter_percentage):
+def real_weights_pruning(param_values_binary, param_values,saved_filter_percentage, network_type):
     number_of_conv_layers = 3
     filters = []
     new_filters = []
@@ -309,12 +314,12 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
         for j in keep_params[i]:
             random[i][j[1]] = 1
 
-    param_values = restructure_param_values(random, param_values, filters)
+    param_values = restructure_param_values(random, param_values, filters, network_type)
         
     return param_values, new_filters
 
 #prune filters which have the smallest sum of quantized weights
-def quantized_weights_pruning(param_values_binary, param_values,saved_filter_percentage):
+def quantized_weights_pruning(param_values_binary, param_values,saved_filter_percentage, network_type):
     number_of_conv_layers = 3
     filters = []
     new_filters = []
@@ -347,6 +352,6 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
     print(random[0])
     print(len(keep_params[0]))
 
-    param_values = restructure_param_values(random, param_values, filters)
+    param_values = restructure_param_values(random, param_values, filters, network_type)
     
     return param_values, new_filters
