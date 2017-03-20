@@ -418,6 +418,13 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
                 new_filters.append(int(np.around(saved_filter_percentage*(int(float(filters[i])/float(2))))))
             else:
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
+    #if theres an odd number of filters then add a filter
+        for j in range(len(new_filters)):
+            if j == 0:
+                continue
+            if new_filters[j]%2 == 1:
+                new_filters[j] = new_filters[j] + 1
+
     else:
         #get two lists which define the number of parameters for each layer of the original and pruned networks 
         for i in param_values_binary:
@@ -482,6 +489,12 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
                 new_filters.append(int(np.around(saved_filter_percentage*(int(float(filters[i])/float(2))))))
             else:
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
+    #if theres an odd number of filters then add a filter
+        for j in range(len(new_filters)):
+            if j == 0:
+                continue
+            if new_filters[j]%2 == 1:
+                new_filters[j] = new_filters[j] + 1
     else:
         #get two lists which define the number of parameters for each layer of the original and pruned networks 
         for i in param_values_binary:
@@ -536,3 +549,14 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
     param_values = restructure_param_values(random, param_values, filters, network_type)
     
     return param_values, new_filters
+
+
+def activations_pruning(activations, saved_filter_percentage, network_type):
+
+
+
+
+    #get activations at each layer output and enter into this function as a list
+    #sum up magnitudes and sort in ascending order
+    #use this info to create the 'random matrix' which determines which weights to prune
+    #prune
