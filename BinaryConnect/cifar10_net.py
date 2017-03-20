@@ -349,35 +349,37 @@ if __name__ == "__main__":
     elif pruning_type == 'real':
         new_param_values, filter_sizes = compress.real_weights_pruning(params_binary, param_values,float(percentage_prune), network_type)
 
-
     cnn_pruned = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
 
-    train_output = lasagne.layers.get_output(cnn, deterministic=False)
+    train_output = lasagne.layers.get_output(cnn_pruned, deterministic=False)
     # squared hinge loss
     loss = T.mean(T.sqr(T.maximum(0.,1.-target*train_output)))
     
     if binary:
         
         # W updates
-        W = lasagne.layers.get_all_params(cnn, binary=True)
-        W_grads = binary_net.compute_grads(loss,cnn)
+        W = lasagne.layers.get_all_params(cnn_pruned, binary=True)
+        W_grads = binary_net.compute_grads(loss,cnn_pruned)
         updates = lasagne.updates.adam(loss_or_grads=W_grads, params=W, learning_rate=LR)
-        updates = binary_net.clipping_scaling(updates,cnn)
+        updates = binary_net.clipping_scaling(updates,cnn_pruned)
         
         # other parameters updates
-        params = lasagne.layers.get_all_params(cnn, trainable=True, binary=False)
+        params = lasagne.layers.get_all_params(cnn_pruned, trainable=True, binary=False)
         updates = OrderedDict(updates.items() + lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR).items())
         
     else:
-        params = lasagne.layers.get_all_params(cnn, trainable=True)
+        params = lasagne.layers.get_all_params(cnn_pruned, trainable=True)
         updates = lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR)
 
-    test_output = lasagne.layers.get_output(cnn, deterministic=True)
+    test_output = lasagne.layers.get_output(cnn_pruned, deterministic=True)
     test_loss = T.mean(T.sqr(T.maximum(0.,1.-target*test_output)))
     test_err = T.mean(T.neq(T.argmax(test_output, axis=1), T.argmax(target, axis=1)),dtype=theano.config.floatX)
-    
+
+    lasagne.layers.set_all_param_values(cnn_pruned, new_param_values)
+    print("hi")
+   
     # Compile a function performing a training step on a mini-batch (by giving the updates dictionary) 
-    # and returning the corresponding training loss:
+    # and returning the corresponding training loss:    
     train_fn = theano.function([input, target, LR], loss, updates=updates)
 
     # Compile a second function computing the validation loss and accuracy:
@@ -390,7 +392,7 @@ if __name__ == "__main__":
     if train == True:
         binary_net.train(
                 train_fn,val_fn,
-                cnn, percentage_prune, pruning_type,
+                cnn_pruned, percentage_prune, pruning_type,
                 batch_size,
                 LR_start,LR_decay,
                 num_epochs,
