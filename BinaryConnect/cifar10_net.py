@@ -166,12 +166,12 @@ if __name__ == "__main__":
                 epsilon=epsilon, 
                 alpha=alpha)
                     
-        cnn = lasagne.layers.NonlinearityLayer(
+        act1 = lasagne.layers.NonlinearityLayer(
                 cnn,
                 nonlinearity=activation) 
                 
         cnn = binary_net.Conv2DLayer(
-                cnn, 
+                act1, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
@@ -188,13 +188,13 @@ if __name__ == "__main__":
                 epsilon=epsilon, 
                 alpha=alpha)
                     
-        cnn = lasagne.layers.NonlinearityLayer(
+        act2 = lasagne.layers.NonlinearityLayer(
                 cnn,
                 nonlinearity=activation) 
                 
         # 256C3-256C3-P2             
         cnn = binary_net.Conv2DLayer(
-                cnn, 
+                act2, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
@@ -209,12 +209,12 @@ if __name__ == "__main__":
                 epsilon=epsilon, 
                 alpha=alpha)
                     
-        cnn = lasagne.layers.NonlinearityLayer(
+        act3 = lasagne.layers.NonlinearityLayer(
                 cnn,
                 nonlinearity=activation) 
                 
         cnn = binary_net.Conv2DLayer(
-                cnn, 
+                act3, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
@@ -231,13 +231,13 @@ if __name__ == "__main__":
                 epsilon=epsilon, 
                 alpha=alpha)
                     
-        cnn = lasagne.layers.NonlinearityLayer(
+        act4 = lasagne.layers.NonlinearityLayer(
                 cnn,
                 nonlinearity=activation) 
                 
         # 512C3-512C3-P2              
         cnn = binary_net.Conv2DLayer(
-                cnn, 
+                act4, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
@@ -252,12 +252,12 @@ if __name__ == "__main__":
                 epsilon=epsilon, 
                 alpha=alpha)
                     
-        cnn = lasagne.layers.NonlinearityLayer(
+        act5 = lasagne.layers.NonlinearityLayer(
                 cnn,
                 nonlinearity=activation) 
                       
         cnn = binary_net.Conv2DLayer(
-                cnn, 
+                act5, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
@@ -274,7 +274,7 @@ if __name__ == "__main__":
                 epsilon=epsilon, 
                 alpha=alpha)
                     
-        cnn = lasagne.layers.NonlinearityLayer(
+        act6 = lasagne.layers.NonlinearityLayer(
                 cnn,
                 nonlinearity=activation) 
         
@@ -282,7 +282,7 @@ if __name__ == "__main__":
         
         # 1024FP-1024FP-10FP            
         cnn = binary_net.DenseLayer(
-                    cnn, 
+                    act6, 
                     binary=binary,
                     stochastic=stochastic,
                     H=H,
@@ -331,9 +331,35 @@ if __name__ == "__main__":
                 epsilon=epsilon, 
                 alpha=alpha)
 
-        return cnn
+        return cnn, act1, act2, act3, act4, act5, act6
 
-    cnn = build_model(128,128,256,256,512,512)
+    cnn, act1, act2, act3, act4, act5, act6 = build_model(128,128,256,256,512,512)
+
+    
+
+    activations = [lasagne.layers.get_output(act1), lasagne.layers.get_output(act2),lasagne.layers.get_output(act3),
+    lasagne.layers.get_output(act4), lasagne.layers.get_output(act5), lasagne.layers.get_output(act6)]
+
+    func_activations = [theano.function([input], [activations[0]]), theano.function([input], [activations[1]]),theano.function([input], [activations[2]]),
+    theano.function([input], [activations[3]]), theano.function([input], [activations[4]]), theano.function([input], [activations[5]])]
+    
+    cnn = load_model('cnnBA_binarized.save', cnn)
+    
+    activations_output = []
+    tmp = []
+    batches = len(valid_set.X)/batch_size
+    
+    for j in range(len(activations)):
+        for i in range(batches):
+            new_act = func_activations[j](valid_set.X[i*batch_size:(i+1)*batch_size])
+            tmp.append(new_act)
+        activations_output.append(tmp)
+        tmp = []
+    
+    print(len(activations_output[0]))
+
+    print("hi")
+
 
     if train == True:
         cnn = load_model('/home/jfar0131/job3/BinaryConnect/cnnBA_binarized.save', cnn)
@@ -348,6 +374,8 @@ if __name__ == "__main__":
         new_param_values, filter_sizes = compress.quantized_weights_pruning(params_binary, param_values,float(percentage_prune), network_type)
     elif pruning_type == 'real':
         new_param_values, filter_sizes = compress.real_weights_pruning(params_binary, param_values,float(percentage_prune), network_type)
+    elif pruning_type == 'activation':
+        new_param_values, filter_sizes = compress.activations_pruning(activations,float(percentage_prune), network_type)        
 
     cnn_pruned = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
 
@@ -376,8 +404,7 @@ if __name__ == "__main__":
     test_err = T.mean(T.neq(T.argmax(test_output, axis=1), T.argmax(target, axis=1)),dtype=theano.config.floatX)
 
     lasagne.layers.set_all_param_values(cnn_pruned, new_param_values)
-    print("hi")
-   
+
     # Compile a function performing a training step on a mini-batch (by giving the updates dictionary) 
     # and returning the corresponding training loss:    
     train_fn = theano.function([input, target, LR], loss, updates=updates)

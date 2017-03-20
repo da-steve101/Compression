@@ -553,6 +553,11 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
 
 def activations_pruning(activations, saved_filter_percentage, network_type):
 
+    for i in activations:
+        print(i)
+        
+    return activations, activations
+
 
 
 
