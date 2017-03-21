@@ -520,7 +520,6 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
             if i == 0 or i == 2 or i == 3:
                 random.append(np.ones((int(float(filters[i])/float(2)))))
                 keep_params.append(mags1_ascending[i][:(int(float(filters[i])/float(2)) - new_filters[i])])
-                print(len(mags1_ascending[i][:(int(float(filters[i])/float(2)) - new_filters[i])]))
             else:
                 random.append(np.zeros(filters[i]))
                 keep_params.append(mags1_ascending[i][(filters[i] - new_filters[i]):])
@@ -551,12 +550,111 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
     return param_values, new_filters
 
 
-def activations_pruning(activations, saved_filter_percentage, network_type):
+def activations_pruning(param_values_binary, param_values, func_activations, valid_set, batch_size, saved_filter_percentage, network_type):
 
-    for i in activations:
-        print(i)
+    number_of_fc_layers = 3
+    filters = []
+    new_filters = []
+
+    if network_type == 'dorefanet':
+        for i in range(5):
+            filters.append(param_values_binary[i].shape[3])
+
+        new_filters = []
+        print(filters)
+
+        for i in range(len(filters)):
+            if i == 0 or i == 2 or i == 3:
+                new_filters.append(int(np.around(saved_filter_percentage*(int(float(filters[i])/float(2))))))
+            else:
+                new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
+    #if theres an odd number of filters then add a filter
+        for j in range(len(new_filters)):
+            if j == 0:
+                continue
+            if new_filters[j]%2 == 1:
+                new_filters[j] = new_filters[j] + 1
+    else:
+        #get two lists which define the number of parameters for each layer of the original and pruned networks 
+        for i in param_values_binary:
+            filters.append(i.shape[0])
+            new_filters.append(int(np.around(saved_filter_percentage*i.shape[0])))
+        #remove fc layer sizes
+        for i in range(number_of_fc_layers):
+            filters.pop()
+            new_filters.pop()
+    
+    #compute activations and put in ascending order
+    activations_output = []
+    tmp = []
+
+    for i in filters:
+        tmp.append(np.zeros(shape=(i)))
+
+    batches = len(valid_set)/batch_size
+    
+    for j in range(len(func_activations)):
+        for i in range(batches):
+            new_act = func_activations[j](valid_set[i*batch_size:(i+1)*batch_size])
+            new_batch_sum = np.sum(np.absolute(new_act[0]), axis=(0,2,3))
+            tmp[j] = np.add(tmp[j], new_batch_sum)
+        activations_output.append(tmp[j].tolist())
+        print("Layer " + str(j) + " done")
+    
+    print(activations_output[1])
+
+    for i in activations_output:
+        print(len(i))
+
+    for i in range(len(activations_output)):
+        for j in range(len(activations_output[i])):
+            activations_output[i][j] = (activations_output[i][j], j)
+
+    activations_ascending = []
+    for i in activations_output:
+        tmp = sorted(i, key=lambda tup: tup[0])
+        activations_ascending.append(tmp)
+
+
+#create matrix of ones and zeros which indicates whether to keep a particular filter
+    keep_params = []
+    random = []
+
+    for i in range(len(activations_ascending)):
+        if network_type == 'dorefanet':
+            if i == 0 or i == 2 or i == 3:
+                random.append(np.ones((int(float(filters[i])/float(2)))))
+                keep_params.append(activations_ascending[i][:(int(float(filters[i])/float(2)) - new_filters[i])])
+            else:
+                random.append(np.zeros(filters[i]))
+                keep_params.append(activations_ascending[i][(filters[i] - new_filters[i]):])
+        else:
+            random.append(np.zeros(filters[i]))
+            keep_params.append(activations_ascending[i][(filters[i] - new_filters[i]):])
+        for j in keep_params[i]:
+            if network_type == 'dorefanet':
+                if i==0 or i==2 or i==3:
+                    if j[1]>(len(random[i])-1):
+                        random[i][j[1]-len(random[i])] = 0
+                    else:
+                        random[i][j[1]] = 0
+                else:
+                    random[i][j[1]] = 1
+
+            else:
+                random[i][j[1]] = 1
+
+    print(random[0])
+    print(activations_ascending[0])
+    print(len(random[0]) == len(activations_ascending[0]))
+
+    print(random[5])
+    print(activations_ascending[5])
+    print(len(random[5]) == len(activations_ascending[5]))
+
+    param_values = restructure_param_values(random, param_values, filters, network_type)
         
-    return activations, activations
+    return param_values, new_filters
 
 
 
