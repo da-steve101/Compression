@@ -20,6 +20,7 @@ import cPickle as pickle
 import gzip
 
 import binary_net
+import batch_norm
 #sys.path.append('../../BinaryConnect/')
 import compress
 
