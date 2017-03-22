@@ -334,7 +334,7 @@ if __name__ == "__main__":
 
         return cnn, act1, act2, act3, act4, act5, act6
 
-   	cnn, act1, act2, act3, act4, act5, act6 = build_model(128,128,256,256,512,512)
+    cnn, act1, act2, act3, act4, act5, act6 = build_model(128,128,256,256,512,512)
 
     params_binary = lasagne.layers.get_all_param_values(cnn, binary=True)
     params = lasagne.layers.get_all_params(cnn)
@@ -342,13 +342,13 @@ if __name__ == "__main__":
 
     #activation output functions
     if pruning_type == 'activation':
-	    activations = [lasagne.layers.get_output(act1), lasagne.layers.get_output(act2),lasagne.layers.get_output(act3),
-	    lasagne.layers.get_output(act4), lasagne.layers.get_output(act5), lasagne.layers.get_output(act6)]
+    	activations = [lasagne.layers.get_output(act1), lasagne.layers.get_output(act2),lasagne.layers.get_output(act3),
+    	lasagne.layers.get_output(act4), lasagne.layers.get_output(act5), lasagne.layers.get_output(act6)]
 
-	    func_activations = [theano.function([input], [activations[0]]), theano.function([input], [activations[1]]),theano.function([input], [activations[2]]),
-	    theano.function([input], [activations[3]]), theano.function([input], [activations[4]]), theano.function([input], [activations[5]])]
+    	func_activations = [theano.function([input], [activations[0]]), theano.function([input], [activations[1]]),theano.function([input], [activations[2]]),
+    	theano.function([input], [activations[3]]), theano.function([input], [activations[4]]), theano.function([input], [activations[5]])]
 
-    train = False
+    #train = False
     if train == True:
         cnn = load_model('/home/jfar0131/job3/BinaryConnect/cnnBA_binarized.save', cnn)
 
