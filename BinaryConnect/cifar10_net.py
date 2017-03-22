@@ -59,6 +59,8 @@ if __name__ == "__main__":
 
     percentage_prune, pruning_type = main(sys.argv[1:])
 
+    percentage_prune = 1-float(percentage_prune)
+
     print('cnnBA_binarized_'+ str(str(percentage_prune).replace(".","")) + '_' + str(pruning_type)+'.save')
 
     network_type = 'binarynet'
@@ -353,13 +355,13 @@ if __name__ == "__main__":
         cnn = load_model('/home/jfar0131/job3/BinaryConnect/cnnBA_binarized.save', cnn)
 
     if pruning_type == 'random':
-        new_param_values, filter_sizes = compress.random_pruning(params_binary, param_values,float(percentage_prune), network_type)
+        new_param_values, filter_sizes = compress.random_pruning(params_binary, param_values,percentage_prune, network_type)
     elif pruning_type == 'quantization':
-        new_param_values, filter_sizes = compress.quantized_weights_pruning(params_binary, param_values,float(percentage_prune), network_type)
+        new_param_values, filter_sizes = compress.quantized_weights_pruning(params_binary, param_values,percentage_prune, network_type)
     elif pruning_type == 'real':
-        new_param_values, filter_sizes = compress.real_weights_pruning(params_binary, param_values,float(percentage_prune), network_type)
+        new_param_values, filter_sizes = compress.real_weights_pruning(params_binary, param_values,percentage_prune, network_type)
     elif pruning_type == 'activation':
-        new_param_values, filter_sizes = compress.activations_pruning(params_binary, param_values, func_activations,valid_set.X, batch_size,float(percentage_prune), network_type)        
+        new_param_values, filter_sizes, normalized = compress.activations_pruning(params_binary, param_values, func_activations,valid_set.X, batch_size, percentage_prune, network_type)        
 
     cnn_pruned, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
 

@@ -585,6 +585,7 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
             new_filters.pop()
     
     #compute activations and put in ascending order
+    maximums = []
     activations_output = []
     tmp = []
 
@@ -598,6 +599,7 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
             new_act = func_activations[j](valid_set[i*batch_size:(i+1)*batch_size])
             new_batch_sum = np.sum(np.absolute(new_act[0]), axis=(0,2,3))
             tmp[j] = np.add(tmp[j], new_batch_sum)
+        maximums.append(max(tmp[j].tolist()))
         activations_output.append(tmp[j].tolist())
         print("Layer " + str(j) + " done")
     
@@ -614,6 +616,17 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
     for i in activations_output:
         tmp = sorted(i, key=lambda tup: tup[0])
         activations_ascending.append(tmp)
+
+    #calculate the normalized values and sort in descending order
+    normalized_sum = []
+    tmp=[]
+    for r in range(len(activations_output)):
+        for y in range(len(activations_output[r])):
+            s = float(activations_output[r][y][0])/float(maximums[r])
+            tmp.append(s)
+        tmp = sorted(tmp, reverse=True)
+        normalized_sum.append(tmp)
+        tmp = []
 
 
 #create matrix of ones and zeros which indicates whether to keep a particular filter
@@ -654,7 +667,7 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
 
     param_values = restructure_param_values(random, param_values, filters, network_type)
         
-    return param_values, new_filters
+    return param_values, new_filters, normalized_sum
 
 
 
