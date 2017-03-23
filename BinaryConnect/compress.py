@@ -19,6 +19,7 @@ from collections import OrderedDict
 
 
 def load_model(filename, model):
+    import lasagne
     f = open(str(filename), 'rb')
     loadedobj = cPickle.load(f)
     lasagne.layers.set_all_param_values(model, loadedobj)
@@ -362,16 +363,13 @@ def random_pruning(param_values_binary, param_values,saved_filter_percentage, ne
             else:
                 random.append(np.random.binomial(1,saved_filter_percentage, size=(1,filters[i]))[0])
                 new_filter_sizes.append(np.sum(random[i]))
-                
         #if theres an odd number of filters then add a filter
         for j in range(len(new_filter_sizes)):
-            if j == 0:
-                continue
             if new_filter_sizes[j]%2 == 1:
                 for k in range(len(random[j])):
                     if random[j][k] == 0:
                         random[j][k] = 1
-                        break
+                        break           
     else:
         for i in param_values_binary:
             filters.append(i.shape[0])
@@ -418,10 +416,9 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
                 new_filters.append(int(np.around(saved_filter_percentage*(int(float(filters[i])/float(2))))))
             else:
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
-    #if theres an odd number of filters then add a filter
+    
+        #if theres an odd number of filters then add a filter
         for j in range(len(new_filters)):
-            if j == 0:
-                continue
             if new_filters[j]%2 == 1:
                 new_filters[j] = new_filters[j] + 1
 
@@ -491,8 +488,6 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
     #if theres an odd number of filters then add a filter
         for j in range(len(new_filters)):
-            if j == 0:
-                continue
             if new_filters[j]%2 == 1:
                 new_filters[j] = new_filters[j] + 1
     else:
@@ -570,8 +565,6 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
     #if theres an odd number of filters then add a filter
         for j in range(len(new_filters)):
-            if j == 0:
-                continue
             if new_filters[j]%2 == 1:
                 new_filters[j] = new_filters[j] + 1
     else:
