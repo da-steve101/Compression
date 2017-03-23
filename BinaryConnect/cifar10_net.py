@@ -352,7 +352,7 @@ if __name__ == "__main__":
 
     #train = False
     if train == True:
-        cnn = load_model('/home/jfar0131/job3/BinaryConnect/cnnBA_binarized.save', cnn)
+        cnn = compress.load_model('/home/jfar0131/job3/BinaryConnect/cnnBA_binarized.save', cnn)
 
     if pruning_type == 'random':
         new_param_values, filter_sizes = compress.random_pruning(params_binary, param_values,percentage_prune, network_type)
