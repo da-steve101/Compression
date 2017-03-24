@@ -357,18 +357,31 @@ def random_pruning(param_values_binary, param_values,saved_filter_percentage, ne
         for i in range(len(filters)):
             if i == 0 or i == 2 or i == 3:
                 random.append(np.random.binomial(1,saved_filter_percentage, size=(1,int(float(filters[i])/float(2))))[0])
-                print(len(random[i]))
                 new_filter_sizes.append(np.sum(random[i]))
             else:
                 random.append(np.random.binomial(1,saved_filter_percentage, size=(1,filters[i]))[0])
                 new_filter_sizes.append(np.sum(random[i]))
-        #if theres an odd number of filters then add a filter
+#if theres an odd number of filters then add a filter so we can scale PEs in hardware.
         for j in range(len(new_filter_sizes)):
-            if new_filter_sizes[j]%2 == 1:
-                for k in range(len(random[j])):
-                    if random[j][k] == 0:
-                        random[j][k] = 1
-                        break           
+            if j == 1 or j == 4:
+                if new_filter_sizes[j]%4 != 0:
+                    if new_filter_sizes[j]%4 > 2:
+                        for k in range(len(random[j])):
+                            if random[j][k] == 0:
+                                random[j][k] = 1
+                                break  
+                    else:
+                        for l in range(new_filter_sizes[j]%4):
+                            for k in range(len(random[j])):
+                                if random[j][k] == 1:
+                                    random[j][k] = 0
+                                    break  
+            else:
+                if new_filter_sizes[j]%2 == 1:
+                    for k in range(len(random[j])):
+                        if random[j][k] == 0:
+                            random[j][k] = 1
+                            break           
     else:
         for i in param_values_binary:
             filters.append(i.shape[0])
@@ -386,9 +399,6 @@ def random_pruning(param_values_binary, param_values,saved_filter_percentage, ne
             new_filter_sizes.append(np.sum(random[i]))
             print(new_filter_sizes[i])
         
-                      
-    print(new_filter_sizes)
-
     for i in param_values_binary:
     	print(i.shape)
     for i in param_values:
@@ -419,8 +429,16 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
     
         #if theres an odd number of filters then add a filter so we can scale PEs in hardware.
         for j in range(len(new_filters)):
-            if new_filters[j]%2 == 1:
-                new_filters[j] = new_filters[j] + 1
+            if j == 1 or j == 4:
+                if new_filters[j]%4 != 0:
+                    if new_filters[j]%4 > 2:
+                        new_filters[j] = new_filters[j] + 1
+                    else:
+                        new_filters[j] = new_filters[j] - new_filters[j]%4
+            else:
+                if new_filters[j]%2 == 1:
+                    new_filters[j] = new_filters[j] + 1
+        print(new_filters)
 
     else:
         #get two lists which define the number of parameters for each layer of the original and pruned networks 
@@ -521,10 +539,17 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
                 new_filters.append(int(np.around(saved_filter_percentage*(int(float(filters[i])/float(2))))))
             else:
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
-    #if theres an odd number of filters then add a filter
+    #if theres an odd number of filters then add a filter so we can scale PEs in hardware.
         for j in range(len(new_filters)):
-            if new_filters[j]%2 == 1:
-                new_filters[j] = new_filters[j] + 1
+            if j == 1 or j == 4:
+                if new_filters[j]%4 != 0:
+                    if new_filters[j]%4 > 2:
+                        new_filters[j] = new_filters[j] + 1
+                    else:
+                        new_filters[j] = new_filters[j] - new_filters[j]%4
+            else:
+                if new_filters[j]%2 == 1:
+                    new_filters[j] = new_filters[j] + 1
     else:
         #get two lists which define the number of parameters for each layer of the original and pruned networks 
         for i in param_values_binary:
@@ -611,10 +636,17 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
                 new_filters.append(int(np.around(saved_filter_percentage*(int(float(filters[i])/float(2))))))
             else:
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
-    #if theres an odd number of filters then add a filter
+    #if theres an odd number of filters then add a filter so we can scale PEs in hardware.
         for j in range(len(new_filters)):
-            if new_filters[j]%2 == 1:
-                new_filters[j] = new_filters[j] + 1
+            if j == 1 or j == 4:
+                if new_filters[j]%4 != 0:
+                    if new_filters[j]%4 > 2:
+                        new_filters[j] = new_filters[j] + 1
+                    else:
+                        new_filters[j] = new_filters[j] - new_filters[j]%4
+            else:
+                if new_filters[j]%2 == 1:
+                    new_filters[j] = new_filters[j] + 1
     else:
         #get two lists which define the number of parameters for each layer of the original and pruned networks 
         for i in param_values_binary:
