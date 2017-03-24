@@ -12,7 +12,7 @@ import theano
 import theano.tensor as T
 
 import lasagne
-
+import cPickle
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from theano.scalar.basic import UnaryScalarOp, same_out_nocomplex

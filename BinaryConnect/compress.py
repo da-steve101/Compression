@@ -12,7 +12,6 @@ np.random.seed(1234) # for reproducibility?
 # theano.sandbox.cuda.use('gpu1') 
 import cPickle
 
-import cPickle as pickle
 import gzip
 
 from collections import OrderedDict  
@@ -143,9 +142,9 @@ def filter_magnitudes(param_values_binary, network_type):
                 for i in range(q.shape[axis3]):
                     for j in range(q.shape[axis4]):
                         if network_type == 'dorefanet':
-                            mag += q[j][i][l][k]
+                            mag += abs(q[j][i][l][k])
                         else:
-                            mag += q[k][l][i][j]
+                            mag += abs(q[k][l][i][j])
             magnitude.append(mag)
             mag = 0
         maximums.append(max(magnitude))
@@ -416,8 +415,9 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
                 new_filters.append(int(np.around(saved_filter_percentage*(int(float(filters[i])/float(2))))))
             else:
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
+        
     
-        #if theres an odd number of filters then add a filter
+        #if theres an odd number of filters then add a filter so we can scale PEs in hardware.
         for j in range(len(new_filters)):
             if new_filters[j]%2 == 1:
                 new_filters[j] = new_filters[j] + 1
@@ -436,6 +436,7 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
     
     keep_params = []
     random = []
+    insurance = []
 
     #create matrix of ones and zeros which indicates whether to keep a particular filter
     for i in range(len(mags1_ascending)):
@@ -443,26 +444,60 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
             if i == 0 or i == 2 or i == 3:
                 random.append(np.ones((int(float(filters[i])/float(2)))))
                 keep_params.append(mags1_ascending[i][:(int(float(filters[i])/float(2)) - new_filters[i])])
+                insurance.append(mags1_ascending[i][(int(float(filters[i])/float(2)) - new_filters[i]):])
             else:
                 random.append(np.zeros(filters[i]))
                 keep_params.append(mags1_ascending[i][(filters[i] - new_filters[i]):])
+                insurance.append(mags1_ascending[i][:(filters[i] - new_filters[i])])
+
         else:
             random.append(np.zeros(filters[i]))
             keep_params.append(mags1_ascending[i][(filters[i] - new_filters[i]):])
+        #due to split alexNet layers, we need to do this to ensure correct parameters are taken removed.
         for j in keep_params[i]:
             if network_type == 'dorefanet':
                 if i==0 or i==2 or i==3:
                     if j[1]>(len(random[i])-1):
-                        random[i][j[1]-len(random[i])] = 0
+                        if random[i][j[1]-len(random[i])] == 0:
+                            for p in range(len(insurance[i])):
+                                if insurance[i][p][1]>(len(random[i])-1):
+                                    if random[i][insurance[i][p][1]-len(random[i])] == 0:
+                                        continue
+                                    else:
+                                        random[i][insurance[i][p][1]-len(random[i])] = 0
+                                        break
+                                else:
+                                    if random[i][insurance[i][p][1]] == 0:
+                                        continue
+                                    else:
+                                        random[i][insurance[i][p][1]] = 0
+                                        break
+                        else:
+                            random[i][j[1]-len(random[i])] = 0
                     else:
-                        random[i][j[1]] = 0
+                        if random[i][j[1]] == 0:
+                            for p in range(len(insurance[i])):
+                                if insurance[i][p][1]>(len(random[i])-1):
+                                    if random[i][insurance[i][p][1]-len(random[i])] == 0:
+                                        continue
+                                    else:
+                                        random[i][insurance[i][p][1]-len(random[i])] = 0
+                                        break
+                                else:
+                                    if random[i][insurance[i][p][1]] == 0:
+                                        continue
+                                    else:
+                                        random[i][insurance[i][p][1]] = 0
+                                        break                       
+                        else:
+                            random[i][j[1]] = 0
                 else:
                     random[i][j[1]] = 1
-
             else:
                 random[i][j[1]] = 1
-
     print(random[0])
+    print(keep_params[0])
+    print(random[0].sum())
 
     param_values = restructure_param_values(random, param_values, filters, network_type)
         
@@ -515,17 +550,30 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
             if i == 0 or i == 2 or i == 3:
                 random.append(np.ones((int(float(filters[i])/float(2)))))
                 keep_params.append(mags1_ascending[i][:(int(float(filters[i])/float(2)) - new_filters[i])])
+                insurance.append(mags1_ascending[i][(int(float(filters[i])/float(2)) - new_filters[i]):])
+
             else:
                 random.append(np.zeros(filters[i]))
                 keep_params.append(mags1_ascending[i][(filters[i] - new_filters[i]):])
+                insurance.append(mags1_ascending[i][:(filters[i] - new_filters[i])])
+
         else:
             random.append(np.zeros(filters[i]))
             keep_params.append(mags1_ascending[i][(filters[i] - new_filters[i]):])
+        #due to split alexNet layers, we need to do this to ensure correct parameters are taken removed.
         for j in keep_params[i]:
             if network_type == 'dorefanet':
                 if i==0 or i==2 or i==3:
                     if j[1]>(len(random[i])-1):
-                        random[i][j[1]-len(random[i])] = 0
+                        if random[i][j[1]-len(random[i])] == 0:
+                            for p in range(len(insurance[i])):
+                                if random[i][insurance[i][p][1]-len(random[i])] == 0:
+                                    continue
+                                else:
+                                    random[i][insurance[i][p][1]-len(random[i])] = 0
+                                    break
+                        else:
+                            random[i][j[1]-len(random[i])] = 0
                     else:
                         random[i][j[1]] = 0
                 else:
@@ -631,17 +679,30 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
             if i == 0 or i == 2 or i == 3:
                 random.append(np.ones((int(float(filters[i])/float(2)))))
                 keep_params.append(activations_ascending[i][:(int(float(filters[i])/float(2)) - new_filters[i])])
+                insurance.append(mags1_ascending[i][(int(float(filters[i])/float(2)) - new_filters[i]):])
+
             else:
                 random.append(np.zeros(filters[i]))
                 keep_params.append(activations_ascending[i][(filters[i] - new_filters[i]):])
+                insurance.append(mags1_ascending[i][:(filters[i] - new_filters[i])])
+
         else:
             random.append(np.zeros(filters[i]))
             keep_params.append(activations_ascending[i][(filters[i] - new_filters[i]):])
+        #due to split alexNet layers, we need to do this to ensure correct parameters are taken removed.
         for j in keep_params[i]:
             if network_type == 'dorefanet':
                 if i==0 or i==2 or i==3:
                     if j[1]>(len(random[i])-1):
-                        random[i][j[1]-len(random[i])] = 0
+                        if random[i][j[1]-len(random[i])] == 0:
+                            for p in range(len(insurance[i])):
+                                if random[i][insurance[i][p][1]-len(random[i])] == 0:
+                                    continue
+                                else:
+                                    random[i][insurance[i][p][1]-len(random[i])] = 0
+                                    break
+                        else:
+                            random[i][j[1]-len(random[i])] = 0
                     else:
                         random[i][j[1]] = 0
                 else:
