@@ -757,26 +757,16 @@ def kernel_filter_pruning_functionality(pruning_type, params_binary, param_value
 
     if pruning_type == 'random':
         new_param_values, filter_sizes = random_pruning(params_binary, param_values,filter_percentage_prune, network_type)
-        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
-        lasagne.layers.set_all_param_values(cnn, new_param_values)
+        
     elif pruning_type == 'quantization':
         new_param_values, filter_sizes = quantized_weights_pruning(params_binary, param_values,filter_percentage_prune, network_type)
-        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])    
-        lasagne.layers.set_all_param_values(cnn, new_param_values)
+
     elif pruning_type == 'real':
         new_param_values, filter_sizes = real_weights_pruning(params_binary, param_values,filter_percentage_prune, network_type)
-        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])   
-        lasagne.layers.set_all_param_values(cnn, new_param_values)
+    
     elif pruning_type == 'activation':
-
-        activations = [lasagne.layers.get_output(act1), lasagne.layers.get_output(act2),lasagne.layers.get_output(act3),
-        lasagne.layers.get_output(act4), lasagne.layers.get_output(act5), lasagne.layers.get_output(act6)]
-
-        func_activations = [theano.function([input], [activations[0]]), theano.function([input], [activations[1]]),theano.function([input], [activations[2]]),
-        theano.function([input], [activations[3]]), theano.function([input], [activations[4]]), theano.function([input], [activations[5]])]
         
         new_param_values, filter_sizes = activations_pruning(params_binary, param_values, func_activations,valid_set, batch_size, filter_percentage_prune, network_type)        
-        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
-        lasagne.layers.set_all_param_values(cnn, new_param_values)
+        
 
-    return cnn, act1, act2, act3, act4, act5, act6, new_param_values, filter_sizes
+    return new_param_values, filter_sizes
