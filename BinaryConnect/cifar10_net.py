@@ -144,6 +144,8 @@ if __name__ == "__main__":
         train_set.X = np.reshape(np.subtract(np.multiply(2./255.,train_set.X),1.),(-1,3,32,32))
         valid_set.X = np.reshape(np.subtract(np.multiply(2./255.,valid_set.X),1.),(-1,3,32,32))
         test_set.X = np.reshape(np.subtract(np.multiply(2./255.,test_set.X),1.),(-1,3,32,32))
+
+        validation_data = valid_set.X
         
         # flatten targets
         train_set.y = np.hstack(train_set.y)
@@ -643,11 +645,11 @@ if __name__ == "__main__":
     if filter_pruning_type != "":
         #Must set train == True to do activations pruning
         if filter_pruning_type != "activation":
-            valid_set.X = None
-        else:
-            #uncomment below if want to test activations pruning but dont want to train
+            validation_data = None
+        #uncomment below if want to test activations pruning but dont want to train
+        #else:
             #train = False
-        cnn, act1, act2, act3, act4, act5, act6, new_param_values, filter_sizes = compress.kernel_filter_pruning_functionality(filter_pruning_type, params_binary, param_values, filter_percentage_prune, network_type, valid_set.X, batch_size)
+        cnn, act1, act2, act3, act4, act5, act6, new_param_values, filter_sizes = compress.kernel_filter_pruning_functionality(filter_pruning_type, params_binary, param_values, filter_percentage_prune, network_type, validation_data, batch_size)
     
     #train network with or without pruning
     if train == True:
