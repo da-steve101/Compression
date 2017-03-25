@@ -641,6 +641,12 @@ if __name__ == "__main__":
 
     #implement kernel filter pruning if defined in the command line
     if filter_pruning_type != "":
+        #Must set train == True to do activations pruning
+        if filter_pruning_type != "activation":
+            valid_set.X = None
+        else:
+            #uncomment below if want to test activations pruning but dont want to train
+            #train = False
         cnn, act1, act2, act3, act4, act5, act6, new_param_values, filter_sizes = compress.kernel_filter_pruning_functionality(filter_pruning_type, params_binary, param_values, filter_percentage_prune, network_type, valid_set.X, batch_size)
     
     #train network with or without pruning
