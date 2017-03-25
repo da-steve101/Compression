@@ -33,35 +33,36 @@ from collections import OrderedDict
 import sys, getopt
 
 def main(argv):
-   percentage_prune = ''
+   filter_percentage_prune = ''
    pruning_type = ''
 
    try:
       opts, args = getopt.getopt(argv,"hp:t:",["percprune=","pruntype="])
    except getopt.GetoptError:
-      print('cifar10_net.py -pp <percentage_prune> -pt <prune_type>')
+      print('cifar10_net.py -p <filter_percentage_prune> -t <prune_type>')
       sys.exit(2)
    for opt, arg in opts:
       if opt == '-h':
-         print('cifar10_net.py -pp <percentage_prune> -pt <prune_type>')
+         print('cifar10_net.py -p <filter_percentage_prune> -t <prune_type>')
          sys.exit()
       elif opt in ("-p", "--percprune"):
         print("hi")
-        percentage_prune = arg
+        filter_percentage_prune = arg
       elif opt in ("-t", "--pruntype"):
          pruning_type = arg
-   print('Percentage Pruned is "', percentage_prune)
+   print('Percentage Pruned is "', filter_percentage_prune)
    print('Pruning Type is "', pruning_type)  
 
-   return percentage_prune, pruning_type
+   return filter_percentage_prune, pruning_type
 
 if __name__ == "__main__":
 
-    percentage_prune, pruning_type = main(sys.argv[1:])
+    filter_percentage_prune, pruning_type = main(sys.argv[1:])
 
-    percentage_prune = 1-float(percentage_prune)
+    filter_percentage_prune = 1-float(filter_percentage_prune)
 
-    print('cnnBA_binarized_'+ str(str(percentage_prune).replace(".","")) + '_' + str(pruning_type)+'.save')
+    if filter_percentage_prune == None:
+        print("zzzzzzzzzzzzzzzzzzcwebjfewyfbewabfrehvfhevwbfuyewvbceuwvfbcewvewlbcewyvcbewv")
 
     network_type = 'binarynet'
     # BN parameters
@@ -109,6 +110,7 @@ if __name__ == "__main__":
     print("train_set_size = "+str(train_set_size))
     shuffle_parts = 1
     print("shuffle_parts = "+str(shuffle_parts))
+    prune = False
     
     print('Loading CIFAR-10 dataset...')
     
@@ -338,10 +340,6 @@ if __name__ == "__main__":
 
     cnn, act1, act2, act3, act4, act5, act6 = build_model(128,128,256,256,512,512)
 
-    params_binary = lasagne.layers.get_all_param_values(cnn, binary=True)
-    params = lasagne.layers.get_all_params(cnn)
-    param_values = lasagne.layers.get_all_param_values(cnn)
-
     #activation output functions
     if pruning_type == 'activation':
     	activations = [lasagne.layers.get_output(act1), lasagne.layers.get_output(act2),lasagne.layers.get_output(act3),
@@ -352,44 +350,53 @@ if __name__ == "__main__":
 
     #train = False
     if train == True:
-        cnn = compress.load_model('/home/jfar0131/job3/BinaryConnect/cnnBA_binarized.save', cnn)
+        cnn = compress.load_model('/home/jfar0131/job3/binarizedNet/cnnBA_binarized.save', cnn)
+
+    params_binary = lasagne.layers.get_all_param_values(cnn, binary=True)
+    params = lasagne.layers.get_all_params(cnn)
+    param_values = lasagne.layers.get_all_param_values(cnn)
 
     if pruning_type == 'random':
-        new_param_values, filter_sizes = compress.random_pruning(params_binary, param_values,percentage_prune, network_type)
+        new_param_values, filter_sizes = compress.random_pruning(params_binary, param_values,filter_percentage_prune, network_type)
+        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
+        lasagne.layers.set_all_param_values(cnn, new_param_values)
     elif pruning_type == 'quantization':
-        new_param_values, filter_sizes = compress.quantized_weights_pruning(params_binary, param_values,percentage_prune, network_type)
+        new_param_values, filter_sizes = compress.quantized_weights_pruning(params_binary, param_values,filter_percentage_prune, network_type)
+        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])    
+        lasagne.layers.set_all_param_values(cnn, new_param_values)
     elif pruning_type == 'real':
-        new_param_values, filter_sizes = compress.real_weights_pruning(params_binary, param_values,percentage_prune, network_type)
+        new_param_values, filter_sizes = compress.real_weights_pruning(params_binary, param_values,filter_percentage_prune, network_type)
+        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])   
+        lasagne.layers.set_all_param_values(cnn, new_param_values)
     elif pruning_type == 'activation':
-        new_param_values, filter_sizes, normalized = compress.activations_pruning(params_binary, param_values, func_activations,valid_set.X, batch_size, percentage_prune, network_type)        
+        new_param_values, filter_sizes, normalized = compress.activations_pruning(params_binary, param_values, func_activations,valid_set.X, batch_size, filter_percentage_prune, network_type)        
+        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
+        lasagne.layers.set_all_param_values(cnn, new_param_values)
 
-    cnn_pruned, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
 
-    train_output = lasagne.layers.get_output(cnn_pruned, deterministic=False)
+    train_output = lasagne.layers.get_output(cnn, deterministic=False)
     # squared hinge loss
     loss = T.mean(T.sqr(T.maximum(0.,1.-target*train_output)))
     
     if binary:
         
         # W updates
-        W = lasagne.layers.get_all_params(cnn_pruned, binary=True)
-        W_grads = binary_net.compute_grads(loss,cnn_pruned)
+        W = lasagne.layers.get_all_params(cnn, binary=True)
+        W_grads = binary_net.compute_grads(loss,cnn)
         updates = lasagne.updates.adam(loss_or_grads=W_grads, params=W, learning_rate=LR)
-        updates = binary_net.clipping_scaling(updates,cnn_pruned)
+        updates = binary_net.clipping_scaling(updates,cnn)
         
         # other parameters updates
-        params = lasagne.layers.get_all_params(cnn_pruned, trainable=True, binary=False)
+        params = lasagne.layers.get_all_params(cnn, trainable=True, binary=False)
         updates = OrderedDict(updates.items() + lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR).items())
         
     else:
-        params = lasagne.layers.get_all_params(cnn_pruned, trainable=True)
+        params = lasagne.layers.get_all_params(cnn, trainable=True)
         updates = lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR)
 
-    test_output = lasagne.layers.get_output(cnn_pruned, deterministic=True)
+    test_output = lasagne.layers.get_output(cnn, deterministic=True)
     test_loss = T.mean(T.sqr(T.maximum(0.,1.-target*test_output)))
     test_err = T.mean(T.neq(T.argmax(test_output, axis=1), T.argmax(target, axis=1)),dtype=theano.config.floatX)
-
-    lasagne.layers.set_all_param_values(cnn_pruned, new_param_values)
 
     # Compile a function performing a training step on a mini-batch (by giving the updates dictionary) 
     # and returning the corresponding training loss:    
@@ -398,14 +405,13 @@ if __name__ == "__main__":
     # Compile a second function computing the validation loss and accuracy:
     val_fn = theano.function([input, target], [test_loss, test_err])
 
-    lasagne.layers.set_all_param_values(cnn_pruned, new_param_values)
 
     print('Training...')
     
     if train == True:
         binary_net.train(
                 train_fn,val_fn,
-                cnn_pruned, percentage_prune, pruning_type,
+                cnn, filter_percentage_prune, pruning_type,
                 batch_size,
                 LR_start,LR_decay,
                 num_epochs,

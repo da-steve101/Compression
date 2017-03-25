@@ -513,9 +513,7 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
                     random[i][j[1]] = 1
             else:
                 random[i][j[1]] = 1
-    print(random[0])
-    print(keep_params[0])
-    print(random[0].sum())
+    print(mags1_ascending[0])
 
     param_values = restructure_param_values(random, param_values, filters, network_type)
         

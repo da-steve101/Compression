@@ -18,7 +18,7 @@ from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 from theano.scalar.basic import UnaryScalarOp, same_out_nocomplex
 from theano.tensor.elemwise import Elemwise
 
-# Our own rounding function, that does not set the gradient to 0 like Theano's
+# Own rounding function, that does not set the gradient to 0 like Theano's
 class Round3(UnaryScalarOp):
     
     def c_code(self, node, name, (x,), (z,), sub):
