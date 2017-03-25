@@ -12,13 +12,13 @@ import theano
 import theano.tensor as T
 
 import lasagne
-import cPickle
+
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
 
 from theano.scalar.basic import UnaryScalarOp, same_out_nocomplex
 from theano.tensor.elemwise import Elemwise
 
-# Own rounding function, that does not set the gradient to 0 like Theano's
+# Our own rounding function, that does not set the gradient to 0 like Theano's
 class Round3(UnaryScalarOp):
     
     def c_code(self, node, name, (x,), (z,), sub):
@@ -34,7 +34,7 @@ round3 = Elemwise(round3_scalar)
 def hard_sigmoid(x):
     return T.clip((x+1.)/2.,0,1)
 
-# The neurons' activations binarization function
+# The neurons' activations ternarization function
 # It behaves like the sign function during forward propagation
 # And like:
 #   hard_tanh(x) = 2*hard_sigmoid(x)-1 
@@ -45,12 +45,12 @@ def binary_tanh_unit(x):
 def binary_sigmoid_unit(x):
     return round3(hard_sigmoid(x))
     
-# The weights' binarization function, 
+# The weights' ternarization function, 
 # taken directly from the BinaryConnect github repository 
 # (which was made available by his authors)
 def binarization(W,H,binary=True,deterministic=False,stochastic=False,srng=None):
     
-    # (deterministic == True) <-> test-time <-> inference-time
+# (deterministic == True) <-> test-time <-> inference-time
     if not binary or (deterministic and stochastic):
         # print("not binary")
         Wb = W
@@ -78,36 +78,45 @@ def binarization(W,H,binary=True,deterministic=False,stochastic=False,srng=None)
     return Wb
 
 def ternarization(W,H,binary=True,deterministic=False,stochastic=False,srng=None):
-
+    
     # (deterministic == True) <-> test-time <-> inference-time
     if not binary or (deterministic and stochastic):
         # print("not binary")
         Wb = W
-
+    
     else:
-        Wb = T.clip(W,-1,1)
-
-        # Stochastic Ternary
+        
+        # [-1,1] -> [0,1]
+        Wb = hard_sigmoid(W/H)
+        # Wb = T.clip(W/H,-1,1)
+        
+        # Stochastic BinaryConnect
         if stochastic:
+        
+            # print("stoch")
+            Wb = T.cast(srng.binomial(n=1, p=Wb, size=T.shape(Wb)), theano.config.floatX)
 
-            Wb = T.cast(T.switch(T.ge(Wb, 0),srng.binomial(n=1, p=Wb, size=T.shape(Wb)),-1*(srng.binomial(n=1, p=-Wb, size=T.shape(Wb)))),theano.config.floatX)
-
-        # Deterministic Ternary 
+        # Deterministic BinaryConnect (round to nearest)
         else:
-            Wb = T.switch(T.gt(Wb,0.8), 1, Wb)
-            Wb = T.switch(T.lt(Wb,-0.8), -1, Wb)
-            Wb = T.switch(T.ge(Wb,-0.8) & T.le(Wb,0.8), 0, Wb)  
-
+            # print("det")
+            Wb = T.switch(T.gt(Wb,0.9), 1, Wb)
+            Wb = T.switch(T.lt(Wb,-0.9), -1, Wb)
+            Wb = T.switch(T.ge(Wb,-0.9) & T.le(Wb,0.9), 0, Wb) 
+        
+        # 0 or 1 -> -1 or 1
+        Wb = T.cast(T.switch(Wb,H,-H), theano.config.floatX)
+    
     return Wb
 
 # This class extends the Lasagne DenseLayer to support BinaryConnect
 class DenseLayer(lasagne.layers.DenseLayer):
     
-    def __init__(self, incoming, num_units, 
+    def __init__(self, incoming, num_units, Layer_mask,
         binary = True, stochastic = True, H=1.,W_LR_scale="Glorot", **kwargs):
         
         self.binary = binary
         self.stochastic = stochastic
+        self.Layer_mask=Layer_mask
         
         self.H = H
         if H == "Glorot":
@@ -129,9 +138,11 @@ class DenseLayer(lasagne.layers.DenseLayer):
             
         else:
             super(DenseLayer, self).__init__(incoming, num_units, **kwargs)
-        
+        self.W = self.W*Layer_mask        
+
     def get_output_for(self, input, deterministic=False, **kwargs):
         
+        self.W = self.W*self.Layer_mask
         self.Wb = ternarization(self.W,self.H,self.binary,deterministic,self.stochastic,self._srng)
         Wr = self.W
         self.W = self.Wb
@@ -145,11 +156,12 @@ class DenseLayer(lasagne.layers.DenseLayer):
 # This class extends the Lasagne Conv2DLayer to support BinaryConnect
 class Conv2DLayer(lasagne.layers.Conv2DLayer):
     
-    def __init__(self, incoming, num_filters, filter_size,
+    def __init__(self, incoming, num_filters, filter_size, Layer_mask,
         binary = True, stochastic = True, H=1.,W_LR_scale="Glorot", **kwargs):
         
         self.binary = binary
         self.stochastic = stochastic
+        self.Layer_mask = Layer_mask        
         
         self.H = H
         if H == "Glorot":
@@ -173,9 +185,11 @@ class Conv2DLayer(lasagne.layers.Conv2DLayer):
             self.params[self.W]=set(['binary'])
         else:
             super(Conv2DLayer, self).__init__(incoming, num_filters, filter_size, **kwargs)    
+        self.W = self.W*Layer_mask
     
     def convolve(self, input, deterministic=False, **kwargs):
         
+        self.W = self.W*self.Layer_mask        
         self.Wb = ternarization(self.W,self.H,self.binary,deterministic,self.stochastic,self._srng)
         Wr = self.W
         self.W = self.Wb
@@ -187,18 +201,20 @@ class Conv2DLayer(lasagne.layers.Conv2DLayer):
         return rvalue
 
 # This function computes the gradient of the binary weights
-def compute_grads(loss,network):
+def compute_grads(loss,network, Masker1, Masker2, Masker3, Masker4, Masker5, Masker6, Masker7, Masker8, Masker9):
         
     layers = lasagne.layers.get_all_layers(network)
     grads = []
-    
+    Masks = [Masker1, Masker2, Masker3, Masker4, Masker5, Masker6, Masker7, Masker8, Masker9]
+    i=0
     for layer in layers:
-    
+
         params = layer.get_params(binary=True)
         if params:
             # print(params[0].name)
-            grads.append(theano.grad(loss, wrt=layer.Wb))
-                
+            grads.append(theano.grad(loss, wrt=layer.Wb)*Masks[i])
+            #grads.append(theano.grad(loss, wrt=layer.Wb))
+            i+=1  
     return grads
 
 # This functions clips the weights after the parameter update
@@ -221,14 +237,13 @@ def clipping_scaling(updates,network):
 # Given a dataset and a model, this function trains the model on the dataset for several epochs
 # (There is no default trainer function in Lasagne yet)
 def train(train_fn,val_fn,
-            model, percentage_prune, pruning_type,
+            model,
             batch_size,
             LR_start,LR_decay,
             num_epochs,
             X_train,y_train,
             X_val,y_val,
-            X_test,y_test,
-            save_path=None,
+            X_test,y_test,H, binary, Masker1, Masker2, Masker3, Masker4, Masker5, Masker6, Masker7, Masker8, Masker9,
             shuffle_parts=1):
     
     # A function which shuffles a dataset
@@ -270,27 +285,27 @@ def train(train_fn,val_fn,
         # return new_X,new_y
     
     # This function trains the model a full epoch (on the whole dataset)
-    def train_epoch(X,y,LR):
+    def train_epoch(X,y,LR, Layer1_mask, Layer2_mask, Layer3_mask, Layer4_mask, Layer5_mask, Layer6_mask, Layer7_mask, Layer8_mask, Layer9_mask):    
         
         loss = 0
         batches = len(X)/batch_size
         
         for i in range(batches):
-            loss += train_fn(X[i*batch_size:(i+1)*batch_size],y[i*batch_size:(i+1)*batch_size],LR)
+            loss += train_fn(X[i*batch_size:(i+1)*batch_size],y[i*batch_size:(i+1)*batch_size],LR, Layer1_mask, Layer2_mask, Layer3_mask, Layer4_mask, Layer5_mask, Layer6_mask, Layer7_mask, Layer8_mask, Layer9_mask)#, HW)
         
         loss/=batches
         
         return loss
     
     # This function tests the model a full epoch (on the whole dataset)
-    def val_epoch(X,y):
+    def val_epoch(X,y, Layer1_mask, Layer2_mask, Layer3_mask, Layer4_mask, Layer5_mask, Layer6_mask, Layer7_mask, Layer8_mask, Layer9_mask):
         
         err = 0
         loss = 0
         batches = len(X)/batch_size
         
         for i in range(batches):
-            new_loss, new_err = val_fn(X[i*batch_size:(i+1)*batch_size], y[i*batch_size:(i+1)*batch_size])
+            new_loss, new_err = val_fn(X[i*batch_size:(i+1)*batch_size], y[i*batch_size:(i+1)*batch_size], Layer1_mask, Layer2_mask, Layer3_mask, Layer4_mask, Layer5_mask, Layer6_mask, Layer7_mask, Layer8_mask, Layer9_mask)
             err += new_err
             loss += new_loss
         
@@ -304,16 +319,22 @@ def train(train_fn,val_fn,
     best_val_err = 100
     best_epoch = 1
     LR = LR_start
+    layers_NZ = lasagne.layers.get_all_layers(cnn)
+    print(layers_NZ)
+    Nonzeros = ((layers_NZ[1].Wb)**2).sum() + ((layers_NZ[3].Wb)**2).sum() + ((layers_NZ[6].Wb)**2).sum() + ((layers_NZ[8].Wb)**2).sum() + ((layers_NZ[11].Wb)**2).sum() + ((layers_NZ[13].Wb)**2).sum() + ((layers_NZ[16].Wb)**2).sum() + ((layers_NZ[18].Wb)**2).sum() + ((layers_NZ[20].Wb)**2).sum()
+    print(Nonzeros.eval({layers_NZ[1].Layer_mask : Masker1, layers_NZ[3].Layer_mask : Masker2, layers_NZ[6].Layer_mask : Masker3, layers_NZ[8].Layer_mask : Masker4, layers_NZ[11].Layer_mask : Masker5, layers_NZ[13].Layer_mask : Masker6, layers_NZ[16].Layer_mask : Masker7, layers_NZ[18].Layer_mask : Masker8, layers_NZ[20].Layer_mask : Masker9}))
     
     # We iterate over epochs:
     for epoch in range(num_epochs):
         
         start_time = time.time()
         
-        train_loss = train_epoch(X_train,y_train,LR)
+        print(Nonzeros.eval({layers_NZ[1].Layer_mask : Masker1, layers_NZ[3].Layer_mask : Masker2, layers_NZ[6].Layer_mask : Masker3, layers_NZ[8].Layer_mask : Masker4, layers_NZ[11].Layer_mask : Masker5, layers_NZ[13].Layer_mask : Masker6, layers_NZ[16].Layer_mask : Masker7, layers_NZ[18].Layer_mask : Masker8, layers_NZ[20].Layer_mask : Masker9}))
+        train_loss = train_epoch(X_train,y_train,LR, Masker1, Masker2, Masker3, Masker4, Masker5, Masker6, Masker7, Masker8, Masker9)
+
         X_train,y_train = shuffle(X_train,y_train)
         
-        val_err, val_loss = val_epoch(X_val,y_val)
+        val_err, val_loss = val_epoch(X_val,y_val, Masker1, Masker2, Masker3, Masker4, Masker5, Masker6, Masker7, Masker8, Masker9)
         
         # test if validation error went down
         if val_err <= best_val_err:
@@ -321,10 +342,10 @@ def train(train_fn,val_fn,
             best_val_err = val_err
             best_epoch = epoch+1
             
-            test_err, test_loss = val_epoch(X_test,y_test)
-
-            f = open('cnnBA_binarized_'+ str(str(percentage_prune).replace(".","")) + '_' + str(pruning_type)+'.save', 'wb')
-            cPickle.dump(lasagne.layers.get_all_param_values(model), f, protocol=cPickle.HIGHEST_PROTOCOL)
+            test_err, test_loss = val_epoch(X_test,y_test, Masker1, Masker2, Masker3, Masker4, Masker5, Masker6, Masker7, Masker8, Masker9)
+            
+            f = open('cnn_07_pruned.save', 'wb')
+            cPickle.dump(lasagne.layers.get_all_param_values(cnn), f, protocol=cPickle.HIGHEST_PROTOCOL)
             f.close()
         
         epoch_duration = time.time() - start_time
