@@ -651,7 +651,7 @@ if __name__ == "__main__":
             #make train True from command line argument and uncomment below if want to test activations pruning but dont want to train
             #train = False
         new_param_values, filter_sizes = compress.kernel_filter_pruning_functionality(filter_pruning_type, params_binary, param_values, filter_percentage_prune, network_type, validation_data, func_activations, batch_size)
-        cnn, act1, act2, act3, act4, act5, act6 = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])   
+        cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])   
         lasagne.layers.set_all_param_values(cnn, new_param_values)
     #train network with or without pruning
     if train == True:
