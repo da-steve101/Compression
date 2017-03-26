@@ -74,16 +74,16 @@ if __name__ == "__main__":
     if filter_percentage_prune != "":
         filter_percentage_prune = 1-float(filter_percentage_prune)
 
-    if prune != "":
-        prune = bool(prune)
-    else:
+    if prune != 'True':
         prune = False
+    else:
+        prune = True
 
     if train != 'False':
-        train = False
-    else:
         train = True
-
+    else:
+        train = False
+    print(train)
     network_type = 'binarynet'
     # BN parameters
     batch_size = 50
@@ -95,6 +95,7 @@ if __name__ == "__main__":
     print("epsilon = "+str(epsilon))
     
     # BinaryOut
+    #activation = binary_net.HWGQ
     activation = binary_net.binary_tanh_unit
     print("activation = binary_net.binary_tanh_unit")
     # activation = binary_net.binary_sigmoid_unit
@@ -189,12 +190,12 @@ if __name__ == "__main__":
                 epsilon=epsilon, 
                 alpha=alpha)
                     
-        cnn = lasagne.layers.NonlinearityLayer(
+        activ = lasagne.layers.NonlinearityLayer(
                 act1,
                 nonlinearity=activation) 
                 
         cnn = binary_net.Conv2DLayer(
-                cnn, 
+                activ, 
                 binary=binary,
                 stochastic=stochastic,
                 H=H,
@@ -384,7 +385,7 @@ if __name__ == "__main__":
         # Compile a second function computing the validation loss and accuracy:
         val_fn = theano.function([input, target], [test_loss, test_err])
 
-        return cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn
+        return cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ
 
     def build_model_prune_and_L2(numfilters1, numfilters2, numfilters3, numfilters4, numfilters5, numfilters6, binary=binary):
         Layer1_mask = T.ftensor4('Layer1_mask')
@@ -628,7 +629,9 @@ if __name__ == "__main__":
         
         return cnn, train_fn, val_fn
 
-    cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn = build_model(128,128,256,256,512,512)
+    cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ = build_model(128,128,256,256,512,512)
+
+    activ_output = theano.function([input], [lasagne.layers.get_output(activ)])
 
     #train = False
     if load != "":
@@ -651,15 +654,16 @@ if __name__ == "__main__":
             #make train True from command line argument and uncomment below if want to test activations pruning but dont want to train
             #train = False
         new_param_values, filter_sizes = compress.kernel_filter_pruning_functionality(filter_pruning_type, params_binary, param_values, filter_percentage_prune, network_type, validation_data, func_activations, batch_size)
-        cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])   
+        cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])   
         lasagne.layers.set_all_param_values(cnn, new_param_values)
     #train network with or without pruning
+    print(train)
     if train == True:
         print('Training...')
         if prune == False:
             binary_net.train(
                     train_fn,val_fn,
-                    cnn, filter_percentage_prune, filter_pruning_type,
+                    cnn, filter_percentage_prune, filter_pruning_type, activ_output,
                     batch_size,
                     LR_start,LR_decay,
                     num_epochs,
