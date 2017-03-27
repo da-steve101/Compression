@@ -29,7 +29,7 @@ np.random.seed(1234)  # for reproducibility
 # theano.sandbox.cuda.use('gpu1')
 import theano
 import theano.tensor as T
-
+import common
 import lasagne
 
 import cPickle as pickle
@@ -136,7 +136,7 @@ if __name__ == "__main__":
 
     for k in range(n_hidden_layers):
 
-        mlp = binary_connect.DenseLayer(
+        mlp = common.DenseLayer(
                 mlp,
                 binary=binary,
                 stochastic=stochastic,
@@ -154,7 +154,7 @@ if __name__ == "__main__":
                 mlp,
                 p=dropout_hidden)
 
-    mlp = binary_connect.DenseLayer(
+    mlp = common.DenseLayer(
                 mlp,
                 binary=binary,
                 stochastic=stochastic,

@@ -169,7 +169,7 @@ if __name__ == "__main__":
                 input_var=input)
 
         # 128C3-128C3-P2
-        cnn = binary_connect.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -186,7 +186,7 @@ if __name__ == "__main__":
                 alpha=alpha,
                 nonlinearity=lasagne.nonlinearities.rectify)
 
-        cnn = binary_connect.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -206,7 +206,7 @@ if __name__ == "__main__":
                 nonlinearity=lasagne.nonlinearities.rectify)
 
         # 256C3-256C3-P2
-        cnn = binary_connect.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -223,7 +223,7 @@ if __name__ == "__main__":
                 alpha=alpha,
                 nonlinearity=lasagne.nonlinearities.rectify)
 
-        cnn = binary_connect.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -243,7 +243,7 @@ if __name__ == "__main__":
                 nonlinearity=lasagne.nonlinearities.rectify)
 
         # 512C3-512C3-P2
-        cnn = binary_connect.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -260,7 +260,7 @@ if __name__ == "__main__":
                 alpha=alpha,
                 nonlinearity=lasagne.nonlinearities.rectify)
 
-        cnn = binary_connect.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -282,7 +282,7 @@ if __name__ == "__main__":
         # print(cnn.output_shape)
 
         # 1024FP-1024FP-10FP
-        cnn = binary_connect.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     binary=binary,
                     stochastic=stochastic,
@@ -297,7 +297,7 @@ if __name__ == "__main__":
                 alpha=alpha,
                 nonlinearity=lasagne.nonlinearities.rectify)
 
-        cnn = binary_connect.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     binary=binary,
                     stochastic=stochastic,
@@ -312,7 +312,7 @@ if __name__ == "__main__":
                 alpha=alpha,
                 nonlinearity=lasagne.nonlinearities.rectify)
 
-        cnn = binary_connect.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     binary=binary,
                     stochastic=stochastic,

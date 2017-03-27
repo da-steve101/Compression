@@ -13,7 +13,7 @@ np.random.seed(1234) # for reproducibility?
 # theano.sandbox.cuda.use('gpu1')
 import theano
 import theano.tensor as T
-
+import common
 import lasagne
 
 import cPickle as pickle
@@ -96,10 +96,10 @@ if __name__ == "__main__":
 
     # BinaryOut
     #activation = binary_net.HWGQ
-    activation = binary_net.binary_tanh_unit
-    print("activation = binary_net.binary_tanh_unit")
-    # activation = binary_net.binary_sigmoid_unit
-    # print("activation = binary_net.binary_sigmoid_unit")
+    activation = common.binary_tanh_unit
+    print("activation = common.binary_tanh_unit")
+    # activation = common.binary_sigmoid_unit
+    # print("activation = common.binary_sigmoid_unit")
 
     # BinaryConnect
     binary = True
@@ -174,7 +174,7 @@ if __name__ == "__main__":
             input_var=input)
 
         # 128C3-128C3-P2
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -194,7 +194,7 @@ if __name__ == "__main__":
                 act1,
                 nonlinearity=activation)
 
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 activ,
                 binary=binary,
                 stochastic=stochastic,
@@ -217,7 +217,7 @@ if __name__ == "__main__":
                 nonlinearity=activation)
 
         # 256C3-256C3-P2
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -237,7 +237,7 @@ if __name__ == "__main__":
                 act3,
                 nonlinearity=activation)
 
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -260,7 +260,7 @@ if __name__ == "__main__":
                 nonlinearity=activation)
 
         # 512C3-512C3-P2
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -280,7 +280,7 @@ if __name__ == "__main__":
                 act5,
                 nonlinearity=activation)
 
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 binary=binary,
                 stochastic=stochastic,
@@ -305,7 +305,7 @@ if __name__ == "__main__":
         # print(cnn.output_shape)
 
         # 1024FP-1024FP-10FP
-        cnn = binary_net.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     binary=binary,
                     stochastic=stochastic,
@@ -323,7 +323,7 @@ if __name__ == "__main__":
                 cnn,
                 nonlinearity=activation)
 
-        cnn = binary_net.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     binary=binary,
                     stochastic=stochastic,
@@ -341,7 +341,7 @@ if __name__ == "__main__":
                 cnn,
                 nonlinearity=activation)
 
-        cnn = binary_net.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     binary=binary,
                     stochastic=stochastic,
@@ -403,7 +403,7 @@ if __name__ == "__main__":
                 input_var=input)
 
         # 128C3-128C3-P2
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 Layer_mask=Layer1_mask,
                 binary=binary,
@@ -424,7 +424,7 @@ if __name__ == "__main__":
                 cnn,
                 nonlinearity=activation)
 
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 Layer_mask=Layer2_mask,
                 binary=binary,
@@ -448,7 +448,7 @@ if __name__ == "__main__":
                 nonlinearity=activation)
 
         # 256C3-256C3-P2
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 Layer_mask=Layer3_mask,
                 binary=binary,
@@ -469,7 +469,7 @@ if __name__ == "__main__":
                 cnn,
                 nonlinearity=activation)
 
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 Layer_mask=Layer4_mask,
                 binary=binary,
@@ -493,7 +493,7 @@ if __name__ == "__main__":
                 nonlinearity=activation)
 
         # 512C3-512C3-P2
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 Layer_mask=Layer5_mask,
                 binary=binary,
@@ -514,7 +514,7 @@ if __name__ == "__main__":
                 cnn,
                 nonlinearity=activation)
 
-        cnn = binary_net.Conv2DLayer(
+        cnn = common.Conv2DLayer(
                 cnn,
                 Layer_mask=Layer6_mask,
                 binary=binary,
@@ -538,7 +538,7 @@ if __name__ == "__main__":
                 nonlinearity=activation)
 
         # 1024FP-1024FP-10FP
-        cnn = binary_net.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     Layer_mask=Layer7_mask,
                     binary=binary,
@@ -557,7 +557,7 @@ if __name__ == "__main__":
                 cnn,
                 nonlinearity=activation)
 
-        cnn = binary_net.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     Layer_mask=Layer8_mask,
                     binary=binary,
@@ -576,7 +576,7 @@ if __name__ == "__main__":
                 cnn,
                 nonlinearity=activation)
 
-        cnn = binary_net.DenseLayer(
+        cnn = common.DenseLayer(
                     cnn,
                     Layer_mask=Layer9_mask,
                     binary=binary,
