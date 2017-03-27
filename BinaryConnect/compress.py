@@ -10,12 +10,12 @@ np.random.seed(1234) # for reproducibility?
 
 # specifying the gpu to use
 # import theano.sandbox.cuda
-# theano.sandbox.cuda.use('gpu1') 
+# theano.sandbox.cuda.use('gpu1')
 import cPickle
 
 import gzip
 
-from collections import OrderedDict  
+from collections import OrderedDict
 
 def load_model(filename, model):
     import lasagne
@@ -29,8 +29,8 @@ def load_model(filename, model):
 #convert all real valued weights into ternary values
 def ternarize_cnn(params, conv_thresh, fc_thresh):
     #for cnn w/out BA, weight param indexes for conv and fc are 0,6,12,...,48
-    conv = [params[0],params[1], params[2], params[3], params[4], params[5]]
-    fc = [params[6], params[7], params[8]]
+    conv = params[0:6]
+    fc = params[6:9]
     count = 0
 
     for i in conv:
@@ -53,11 +53,11 @@ def ternarize_cnn(params, conv_thresh, fc_thresh):
 
 def binarize_cnn(param_values_binary, network_type):
     if network_type == 'dorefanet':
-        conv = [param_values_binary[0],param_values_binary[1], param_values_binary[2], param_values_binary[3], param_values_binary[4]]
-        fc = [param_values_binary[5], param_values_binary[6], param_values_binary[7]]
+        conv = param_values_binary[0:5]
+        fc = param_values_binary[5:8]
     else:
-        conv = [param_values_binary[0],param_values_binary[1], param_values_binary[2], param_values_binary[3], param_values_binary[4], param_values_binary[5]]
-        fc = [param_values_binary[6], param_values_binary[7], param_values_binary[8]]
+        conv = param_values_binary[0:6]
+        fc = param_values_binary[6:9]
 
     count = 0
 
@@ -101,13 +101,13 @@ def count_zeros_conv(kernel, index1,index2,index3, index4):
                         elif (kernel[j][i][l][k] == -1.):
                             counter_neg.append(count)
                             count = 0
-                        else:  
+                        else:
                             print("error")
                     else:
                         count += 1
 
     data1 = Counter(counter_pos).most_common()
-    data2 = Counter(counter_neg).most_common() 
+    data2 = Counter(counter_neg).most_common()
     data3 = Counter(counter)
     print(data3)
     print(data1)
@@ -116,9 +116,9 @@ def count_zeros_conv(kernel, index1,index2,index3, index4):
 #calculate absolute sum of all kernels in each layer and return a list of magnitudes for each layer and its normalized version
 def filter_magnitudes(param_values_binary, network_type):
     if network_type == 'dorefanet':
-        conv = [param_values_binary[0],param_values_binary[1], param_values_binary[2], param_values_binary[3], param_values_binary[4]]
+        conv = param_values_binary[0:5]
     else:
-        conv = [param_values_binary[0],param_values_binary[1], param_values_binary[2], param_values_binary[3], param_values_binary[4], param_values_binary[5]]
+        conv = param_values_binary[0:6]
     magnitude = []
     magnitude_layers = []
     maximums = []
@@ -151,7 +151,7 @@ def filter_magnitudes(param_values_binary, network_type):
         magnitude_layers.append(magnitude)
         magnitude = []
 
-    #sort magnitudes in ascending order and make a tuple by adding their index number (value,index) 
+    #sort magnitudes in ascending order and make a tuple by adding their index number (value,index)
     # so that we know we cut off the first elements and then we have their indexes to know which parameters to remove from the cnn
     for i in range(len(magnitude_layers)):
         for j in range(len(magnitude_layers[i])):
@@ -202,7 +202,6 @@ def restructure_param_values(random, param_values, filters, network_type):
             j=0
             z=0
             for i in range(len(random[p-k])):
-                e = 36*i
                 if (random[p-k][i]==0):
                     if (p == 1 or p == 16):
                         param_values[p] = np.delete(param_values[p], i-j,3)
@@ -213,7 +212,7 @@ def restructure_param_values(random, param_values, filters, network_type):
                         if p==1:
                             param_values[p+5] = np.delete(param_values[p+5], i-j,2)
                         elif p==16:
-                            param_values[p+5] = np.delete(param_values[p+5], [(e-(36*j)),(e-(36*j))+1,(e-(36*j))+2,(e-(36*j))+3,(e-(36*j))+4,(e-(36*j))+5,(e-(36*j))+6,(e-(36*j))+7,(e-(36*j))+8,(e-(36*j))+9,(e-(36*j))+10,(e-(36*j))+11,(e-(36*j))+12,(e-(36*j))+13,(e-(36*j))+14,(e-(36*j))+15, (e-(36*j))+16,(e-(36*j))+17,(e-(36*j))+18,(e-(36*j))+19,(e-(36*j))+20,(e-(36*j))+21,(e-(36*j))+22,(e-(36*j))+23,(e-(36*j))+24,(e-(36*j))+25,(e-(36*j))+26,(e-(36*j))+27,(e-(36*j))+28,(e-(36*j))+29,(e-(36*j))+30, (e-(36*j))+31,(e-(36*j))+32,(e-(36*j))+33,(e-(36*j))+34,(e-(36*j))+35] ,0)
+                            param_values[p+5] = np.delete(param_values[p+5], [36*(i - j) + q for q in range(36) ],0)
                         else:
                             print("error")
 
@@ -232,12 +231,7 @@ def restructure_param_values(random, param_values, filters, network_type):
                         param_values[p+4] = np.delete(param_values[p+4], (i-j-z) + len(random[p-k]),0)
                     j+=1
             k+=4
-            print(param_values[p].shape)
-            print(param_values[p+1].shape)
-            print(param_values[p+2].shape)
-            print(param_values[p+3].shape)
-            print(param_values[p+4].shape)
-            print(param_values[p+5].shape)
+            print([ pv.shape for pv in param_values[p:p+6] ])
         # print(param_values[36].shape)
         # print(param_values[42].shape)
         # print(param_values[48].shape)
@@ -245,7 +239,6 @@ def restructure_param_values(random, param_values, filters, network_type):
         for p in xrange(0,(len(random)*6), 6):
             j=0
             for i in range(len(random[(int(float(p)/float(6)))])):
-                e = 16*i
                 if (random[(int(float(p)/float(6)))][i]==0):
                     param_values[p] = np.delete(param_values[p], i-j,0)
                     if (p<(len(filters)*5)):
@@ -261,14 +254,10 @@ def restructure_param_values(random, param_values, filters, network_type):
                         param_values[p+3] = np.delete(param_values[p+3], i-j,ax)
                         param_values[p+4] = np.delete(param_values[p+4], i-j,ax)
                         param_values[p+5] = np.delete(param_values[p+5], i-j,ax)
-                        param_values[p+6] = np.delete(param_values[p+6], [(e-(16*j)),(e-(16*j))+1,(e-(16*j))+2,(e-(16*j))+3,(e-(16*j))+4,(e-(16*j))+5,(e-(16*j))+6,(e-(16*j))+7,(e-(16*j))+8,(e-(16*j))+9,(e-(16*j))+10,(e-(16*j))+11,(e-(16*j))+12,(e-(16*j))+13,(e-(16*j))+14,(e-(16*j))+15] ,0)
+                        param_values[p+6] = np.delete(param_values[p+6], [16*(i - j) + q for q in range(16) ] ,0)
                     j+=1
-            print(param_values[p].shape)
-            print(param_values[p+1].shape)
-            print(param_values[p+2].shape)
-            print(param_values[p+3].shape)
-            print(param_values[p+4].shape)
-            print(param_values[p+5].shape)
+            for pv in param_values[p:p+6]:
+                print( pv.shape )
         # print(param_values[36].shape)
         # print(param_values[42].shape)
         # print(param_values[48].shape)
@@ -280,9 +269,9 @@ def restructure_param_values(random, param_values, filters, network_type):
 #outputs magnitude tuples: (absolute magnitudes, index filter number) in order and also in ascending order and also the normalized values in descending order
 def filter_quantized_sum(quantized_params, network_type):
     if network_type == 'dorefanet':
-        conv = [quantized_params[0],quantized_params[1], quantized_params[2], quantized_params[3], quantized_params[4]]
+        conv = quantized_params[0:5]
     else:
-        conv = [quantized_params[0],quantized_params[1], quantized_params[2], quantized_params[3], quantized_params[4], quantized_params[5]]
+        conv = quantized_params[0:6]
 
     magnitude = []
     magnitude_layers = []
@@ -316,7 +305,7 @@ def filter_quantized_sum(quantized_params, network_type):
         magnitude_layers.append(magnitude)
         magnitude = []
 
-    #sort magnitudes in ascending order and make a tuple by adding their index number (value,index) 
+    #sort magnitudes in ascending order and make a tuple by adding their index number (value,index)
     # so that we know we cut off the first elements and then we have their indexes to know which parameters to remove from the cnn
     for i in range(len(magnitude_layers)):
         for j in range(len(magnitude_layers[i])):
@@ -327,7 +316,7 @@ def filter_quantized_sum(quantized_params, network_type):
         tmp = sorted(i, key=lambda tup: tup[0])
         magnitude_layers_ascending.append(tmp)
 
-    #calculate the normalized values and sort in descending order (for the plots) where max value is the 
+    #calculate the normalized values and sort in descending order (for the plots) where max value is the
     # maximum absolute value (i.e value furtherest from zero)
     normalized_sums = []
     tmp=[]
@@ -361,7 +350,7 @@ def random_pruning(param_values_binary, param_values,saved_filter_percentage, ne
             else:
                 random.append(np.random.binomial(1,saved_filter_percentage, size=(1,filters[i]))[0])
                 new_filter_sizes.append(np.sum(random[i]))
-#if theres an odd number of filters then add a filter so we can scale PEs in hardware.
+        #if theres an odd number of filters then add a filter so we can scale PEs in hardware.
         for j in range(len(new_filter_sizes)):
             if j == 1 or j == 4:
                 if new_filter_sizes[j]%4 != 0:
@@ -369,23 +358,23 @@ def random_pruning(param_values_binary, param_values,saved_filter_percentage, ne
                         for k in range(len(random[j])):
                             if random[j][k] == 0:
                                 random[j][k] = 1
-                                break  
+                                break
                     else:
                         for l in range(new_filter_sizes[j]%4):
                             for k in range(len(random[j])):
                                 if random[j][k] == 1:
                                     random[j][k] = 0
-                                    break  
+                                    break
             else:
                 if new_filter_sizes[j]%2 == 1:
                     for k in range(len(random[j])):
                         if random[j][k] == 0:
                             random[j][k] = 1
-                            break           
+                            break
     else:
         for i in param_values_binary:
             filters.append(i.shape[0])
-        
+
         #remove fc layer sizes
         filters.pop()
         filters.pop()
@@ -395,14 +384,14 @@ def random_pruning(param_values_binary, param_values,saved_filter_percentage, ne
         new_filter_sizes = []
 
         for i in range(len(filters)):
-            random.append(np.random.binomial(1,saved_filter_percentage, size=(1,filters[i]))[0])  
+            random.append(np.random.binomial(1,saved_filter_percentage, size=(1,filters[i]))[0])
             new_filter_sizes.append(np.sum(random[i]))
             print(new_filter_sizes[i])
-        
+
     for i in param_values_binary:
     	print(i.shape)
     for i in param_values:
-    	print(i.shape)    
+        print(i.shape)
 
     param_values = restructure_param_values(random, param_values, filters, network_type)
 
@@ -425,8 +414,8 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
                 new_filters.append(int(np.around(saved_filter_percentage*(int(float(filters[i])/float(2))))))
             else:
                 new_filters.append(int(np.around(saved_filter_percentage*filters[i])))
-        
-    
+
+
         #if theres an odd number of filters then add a filter so we can scale PEs in hardware.
         for j in range(len(new_filters)):
             if j == 1 or j == 4:
@@ -441,7 +430,7 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
         print(new_filters)
 
     else:
-        #get two lists which define the number of parameters for each layer of the original and pruned networks 
+        #get two lists which define the number of parameters for each layer of the original and pruned networks
         for i in param_values_binary:
             filters.append(i.shape[0])
             new_filters.append(int(np.around(saved_filter_percentage*i.shape[0])))
@@ -451,7 +440,7 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
             new_filters.pop()
 
     mags1, mags1_ascending, normalized = filter_magnitudes(param_values_binary, network_type)
-    
+
     keep_params = []
     random = []
     insurance = []
@@ -506,7 +495,7 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
                                         continue
                                     else:
                                         random[i][insurance[i][p][1]] = 0
-                                        break                       
+                                        break
                         else:
                             random[i][j[1]] = 0
                 else:
@@ -516,7 +505,7 @@ def real_weights_pruning(param_values_binary, param_values,saved_filter_percenta
     print(mags1_ascending[0])
 
     param_values = restructure_param_values(random, param_values, filters, network_type)
-        
+
     return param_values, new_filters
 
 #prune filters which have the smallest sum of quantized weights
@@ -549,7 +538,7 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
                 if new_filters[j]%2 == 1:
                     new_filters[j] = new_filters[j] + 1
     else:
-        #get two lists which define the number of parameters for each layer of the original and pruned networks 
+        #get two lists which define the number of parameters for each layer of the original and pruned networks
         for i in param_values_binary:
             filters.append(i.shape[0])
             new_filters.append(int(np.around(saved_filter_percentage*i.shape[0])))
@@ -561,7 +550,7 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
     binarized_params = binarize_cnn(param_values_binary, network_type)
 
     mags1, mags1_ascending, normalized = filter_quantized_sum(binarized_params, network_type)
-    
+
     keep_params = []
     random = []
 
@@ -609,10 +598,10 @@ def quantized_weights_pruning(param_values_binary, param_values,saved_filter_per
     # for i in param_values_binary:
     #     print(i.shape)
     # for i in param_values:
-    #     print(i.shape) 
+    #     print(i.shape)
 
     param_values = restructure_param_values(random, param_values, filters, network_type)
-    
+
     return param_values, new_filters
 
 
@@ -646,7 +635,7 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
                 if new_filters[j]%2 == 1:
                     new_filters[j] = new_filters[j] + 1
     else:
-        #get two lists which define the number of parameters for each layer of the original and pruned networks 
+        #get two lists which define the number of parameters for each layer of the original and pruned networks
         for i in param_values_binary:
             filters.append(i.shape[0])
             new_filters.append(int(np.around(saved_filter_percentage*i.shape[0])))
@@ -654,7 +643,7 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
         for i in range(number_of_fc_layers):
             filters.pop()
             new_filters.pop()
-    
+
     #compute activations and put in ascending order
     maximums = []
     activations_output = []
@@ -664,7 +653,7 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
         tmp.append(np.zeros(shape=(i)))
 
     batches = len(valid_set)/batch_size
-    
+
     for j in range(len(func_activations)):
         for i in range(batches):
             new_act = func_activations[j](valid_set[i*batch_size:(i+1)*batch_size])
@@ -673,7 +662,7 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
         maximums.append(max(tmp[j].tolist()))
         activations_output.append(tmp[j].tolist())
         print("Layer " + str(j) + " done")
-    
+
     print(activations_output[1])
 
     for i in activations_output:
@@ -750,23 +739,22 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
     print(len(random[5]) == len(activations_ascending[5]))
 
     param_values = restructure_param_values(random, param_values, filters, network_type)
-        
+
     return param_values, new_filters
 
 def kernel_filter_pruning_functionality(pruning_type, params_binary, param_values, filter_percentage_prune, network_type, valid_set, func_activations, batch_size):
 
     if pruning_type == 'random':
-        new_param_values, filter_sizes = random_pruning(params_binary, param_values,filter_percentage_prune, network_type)
-        
+        new_param_values, filter_sizes = random_pruning( params_binary, param_values,
+                                                         filter_percentage_prune, network_type)
     elif pruning_type == 'quantization':
-        new_param_values, filter_sizes = quantized_weights_pruning(params_binary, param_values,filter_percentage_prune, network_type)
-
+        new_param_values, filter_sizes = quantized_weights_pruning( params_binary, param_values,
+                                                                    filter_percentage_prune, network_type)
     elif pruning_type == 'real':
-        new_param_values, filter_sizes = real_weights_pruning(params_binary, param_values,filter_percentage_prune, network_type)
-    
+        new_param_values, filter_sizes = real_weights_pruning( params_binary, param_values,
+                                                               filter_percentage_prune, network_type)
     elif pruning_type == 'activation':
-        
-        new_param_values, filter_sizes = activations_pruning(params_binary, param_values, func_activations,valid_set, batch_size, filter_percentage_prune, network_type)        
-        
-
+        new_param_values, filter_sizes = activations_pruning( params_binary, param_values,
+                                                              func_activations, valid_set, batch_size,
+                                                              filter_percentage_prune, network_type)
     return new_param_values, filter_sizes
