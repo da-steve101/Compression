@@ -26,7 +26,6 @@ import numpy as np
 # theano.sandbox.cuda.use('gpu1')
 import theano
 import theano.tensor as T
-import common
 import lasagne
 
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams

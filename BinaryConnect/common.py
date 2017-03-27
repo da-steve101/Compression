@@ -5,6 +5,7 @@ import theano
 import theano.tensor as T
 from theano.scalar.basic import UnaryScalarOp, same_out_nocomplex
 from theano.sandbox.rng_mrg import MRG_RandomStreams as RandomStreams
+from theano.tensor.elemwise import Elemwise
 import lasagne
 
 import numpy as np

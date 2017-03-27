@@ -29,7 +29,7 @@ np.random.seed(1234) # for reproducibility?
 # theano.sandbox.cuda.use('gpu1')
 import theano
 import theano.tensor as T
-
+import common
 import lasagne
 import cPickle
 
@@ -49,30 +49,21 @@ import pylab
 
 from collections import OrderedDict
 
-import getopt
+import argparse
 
 def main(argv):
    percentage_prune = ''
    pruning_type = ''
 
-   try:
-      opts, args = getopt.getopt(argv,"hp:t:",["percprune=","pruntype="])
-   except getopt.GetoptError:
-      print('cifar10.py -pp <percentage_prune> -pt <prune_type>')
-      sys.exit(2)
-   for opt, arg in opts:
-      if opt == '-h':
-         print('cifar10.py -pp <percentage_prune> -pt <prune_type>')
-         sys.exit()
-      elif opt in ("-p", "--percprune"):
-        print("hi")
-        percentage_prune = arg
-      elif opt in ("-t", "--pruntype"):
-         pruning_type = arg
-   print('Percentage Pruned is "', percentage_prune)
-   print('Pruning Type is "', pruning_type)
+   parser = argparse.ArgumentParser(description='Train a TNN on the cifar10 dataset')
+   parser.add_argument("percprune", type=float )
+   parser.add_argument("pruntype")
+   args = parser.parse_args()
+   
+   print('Percentage Pruned is "', args.percprune)
+   print('Pruning Type is "', args.pruntype)
 
-   return percentage_prune, pruning_type
+   return args.percprune, args.pruntype
 
 if __name__ == "__main__":
 
@@ -349,6 +340,8 @@ if __name__ == "__main__":
         new_param_values, filter_sizes = compress.quantized_weights_pruning(params_binary, param_values,float(percentage_prune), network_type)
     elif pruning_type == 'real':
         new_param_values, filter_sizes = compress.real_weights_pruning(params_binary, param_values,float(percentage_prune), network_type)
+    else:
+       raise Exception("pruning_type " + str( pruning_type) + " is not valid")
 
     cnn_pruned = build_model(filter_sizes[0],filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
 

@@ -30,59 +30,36 @@ from pylearn2.utils import serial
 
 from collections import OrderedDict
 
-import sys, getopt
+import sys
+import argparse
 
 def main(argv):
-   filter_percentage_prune = ''
-   filter_pruning_type = ''
-   load = ''
-   prune = ''
-   train = ''
 
-   try:
-      opts, args = getopt.getopt(argv,"hp:t:m:c:l:",["percprune=","pruntype=", "method=", "connections=", "load="])
-   except getopt.GetoptError:
-      print('cifar10_net.py -p <filter_percentage_prune> -t <prune_type> -m <train_method> -c <prune_connections>, -l <load_model>')
-      sys.exit(2)
-   for opt, arg in opts:
-      if opt == '-h':
-         print('cifar10_net.py -p <filter_percentage_prune> -t <prune_type> -m <train_method> -c <prune_connections>, -l <load_model>')
-         sys.exit()
-      elif opt in ("-p", "--percprune"):
-        print("hi")
-        filter_percentage_prune = arg
-      elif opt in ("-t", "--pruntype"):
-         filter_pruning_type = arg
-      elif opt in ("-m", "--method"):
-        train = arg
-      elif opt in ("-c", "--connections"):
-         prune = arg
-      elif opt in ("-l", "--load"):
-         load = arg
-   print('Percentage Pruned is ', filter_percentage_prune)
-   print('Pruning Type is ', filter_pruning_type)
-   print('Prune Connections? ', prune)
-   print('Train? ', train)
-   print('Load model form ', load)
+   parser = argparse.ArgumentParser(description='Train a TNN on the cifar10 dataset')
+   parser.add_argument("percprune", type=float )
+   parser.add_argument("--train", action="store_true")
+   parser.add_argument("--prune", action="store_true")
+   parser.add_argument("--pruntype", nargs="?", choices=['activation', 'none'], default = "none")
+   parser.add_argument("--load", nargs="?")
+   args = parser.parse_args()
 
-   return filter_percentage_prune, filter_pruning_type, prune, train, load
+   print(args)
+   
+   if args.load is not None and args.train:
+      parser.error("load requires train to be false")
+   
+   print('Percentage Pruned is ', args.percprune)
+   print('Pruning Type is ', args.pruntype)
+   print('Prune Connections? ', args.prune)
+   print('Train? ', args.train)
+   print('Load model from ', args.load)
+
+   return (1 - args.percprune), args.pruntype, args.prune, args.train, args.load
 
 if __name__ == "__main__":
 
     filter_percentage_prune, filter_pruning_type, prune, train, load = main(sys.argv[1:])
 
-    if filter_percentage_prune != "":
-        filter_percentage_prune = 1-float(filter_percentage_prune)
-
-    if prune != 'True':
-        prune = False
-    else:
-        prune = True
-
-    if train != 'False':
-        train = True
-    else:
-        train = False
     print(train)
     network_type = 'binarynet'
     # BN parameters
@@ -398,6 +375,12 @@ if __name__ == "__main__":
         Layer8_mask = T.fmatrix('Layer8_mask')
         Layer9_mask = T.fmatrix('Layer9_mask')
 
+        layer_masks = [ Layer1_mask, Layer2_mask,
+                        Layer3_mask, Layer4_mask,
+                        Layer5_mask, Layer6_mask,
+                        Layer7_mask, Layer8_mask,
+                        Layer9_mask ]
+        
         cnn = lasagne.layers.InputLayer(
                 shape=(None, 3, 32, 32),
                 input_var=input)
@@ -605,11 +588,7 @@ if __name__ == "__main__":
 
             # W updates
             W = lasagne.layers.get_all_params(cnn, binary=True)
-            W_grads = binary_net.compute_grads( loss, cnn, Layer1_mask,
-                                                Layer2_mask, Layer3_mask,
-                                                Layer4_mask, Layer5_mask,
-                                                Layer6_mask, Layer7_mask,
-                                                Layer8_mask, Layer9_mask)
+            W_grads = binary_net.compute_grads( loss, cnn, layer_masks )
             updates = lasagne.updates.adam(loss_or_grads=W_grads, params=W, learning_rate=LR)
             updates = binary_net.clipping_scaling(updates,cnn)
 
@@ -627,18 +606,10 @@ if __name__ == "__main__":
 
         # Compile a function performing a training step on a mini-batch (by giving the updates dictionary)
         # and returning the corresponding training loss:
-        train_fn = theano.function([input, target, LR, Layer1_mask,
-                                    Layer2_mask, Layer3_mask, Layer4_mask,
-                                    Layer5_mask, Layer6_mask, Layer7_mask,
-                                    Layer8_mask, Layer9_mask], loss, updates=updates)
+        train_fn = theano.function([input, target, LR ] + layer_masks, loss, updates=updates)
 
         # Compile a second function computing the validation loss and accuracy:
-        val_fn = theano.function([input, target, Layer1_mask,
-                                  Layer2_mask, Layer3_mask,
-                                  Layer4_mask, Layer5_mask,
-                                  Layer6_mask, Layer7_mask,
-                                  Layer8_mask, Layer9_mask],
-                                 [test_loss, test_err])
+        val_fn = theano.function([input, target ] + layer_masks, [test_loss, test_err])
 
         return cnn, train_fn, val_fn
 
@@ -669,7 +640,12 @@ if __name__ == "__main__":
         new_param_values, filter_sizes = compress.kernel_filter_pruning_functionality(
            filter_pruning_type, params_binary, param_values, filter_percentage_prune,
            network_type, validation_data, func_activations, batch_size)
-        cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ = build_model( filter_sizes[0], filter_sizes[1],filter_sizes[2],filter_sizes[3],filter_sizes[4],filter_sizes[5])
+        cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ = build_model( filter_sizes[0],
+                                                                                        filter_sizes[1],
+                                                                                        filter_sizes[2],
+                                                                                        filter_sizes[3],
+                                                                                        filter_sizes[4],
+                                                                                        filter_sizes[5])
         lasagne.layers.set_all_param_values(cnn, new_param_values)
     #train network with or without pruning
     print(train)
@@ -732,7 +708,7 @@ if __name__ == "__main__":
             Masker9 = Masker9.astype(np.float32)
             print(count)
 
-            binary_net_prune.train( train_fn,val_fn,
+            binary_net.train_prune( train_fn,val_fn,
                                     cnn,
                                     batch_size,
                                     LR_start,LR_decay,
