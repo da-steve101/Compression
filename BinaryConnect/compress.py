@@ -742,7 +742,10 @@ def activations_pruning(param_values_binary, param_values, func_activations, val
 
     return param_values, new_filters
 
-def kernel_filter_pruning_functionality(pruning_type, params_binary, param_values, filter_percentage_prune, network_type, valid_set, func_activations, batch_size):
+def kernel_filter_pruning_functionality(pruning_type, params_binary,
+                                        param_values, filter_percentage_prune,
+                                        network_type, valid_set,
+                                        func_activations, batch_size):
 
     if pruning_type == 'random':
         new_param_values, filter_sizes = random_pruning( params_binary, param_values,
@@ -757,4 +760,6 @@ def kernel_filter_pruning_functionality(pruning_type, params_binary, param_value
         new_param_values, filter_sizes = activations_pruning( params_binary, param_values,
                                                               func_activations, valid_set, batch_size,
                                                               filter_percentage_prune, network_type)
+    else:
+        raise Exception("pruning_type is " + str( pruning_type ) + " which is invalid" )
     return new_param_values, filter_sizes

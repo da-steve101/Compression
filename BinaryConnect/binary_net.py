@@ -49,7 +49,7 @@ def clipping_scaling(updates,network):
     return updates
 
 # A function which shuffles a dataset
-def shuffle(X,y):
+def shuffle(X,y, shuffle_parts ):
 
     # print(len(X))
 
@@ -87,7 +87,7 @@ def shuffle(X,y):
     # return new_X,new_y
 
 # This function trains the model a full epoch (on the whole dataset)
-def train_epoch( X, y, LR, Layer_masks = []):
+def train_epoch( X, y, LR, batch_size, train_fn, Layer_masks = []):
 
     loss = 0
     batches = len(X)/batch_size
@@ -138,7 +138,7 @@ def train(train_fn,val_fn,
     
 
     # shuffle the train set
-    X_train,y_train = shuffle(X_train,y_train)
+    X_train,y_train = shuffle(X_train,y_train, shuffle_parts )
     best_val_err = 100
     best_epoch = 1
     LR = LR_start
@@ -148,8 +148,8 @@ def train(train_fn,val_fn,
 
         start_time = time.time()
 
-        train_loss = train_epoch(X_train,y_train,LR)
-        X_train,y_train = shuffle(X_train,y_train)
+        train_loss = train_epoch( X_train, y_train, LR, batch_size, train_fn )
+        X_train,y_train = shuffle( X_train, y_train, shuffle_parts )
 
         val_err, val_loss = val_epoch( X_val, y_val, activ_output = activ_output )
 
@@ -197,7 +197,7 @@ def train_prune(train_fn, val_fn,
     assert len(Masks) == 9, "Must be 9 masks"
     
     # shuffle the train set
-    X_train,y_train = shuffle( X_train, y_train)
+    X_train,y_train = shuffle( X_train, y_train, shuffle_parts )
     best_val_err = 100
     best_epoch = 1
     LR = LR_start
@@ -215,9 +215,9 @@ def train_prune(train_fn, val_fn,
         start_time = time.time()
 
         print(Nonzeros.eval(mask_dict))
-        train_loss = train_epoch( X_train, y_train, LR, Masks )
+        train_loss = train_epoch( X_train, y_train, LR, batch_size, train_fn, Masks )
 
-        X_train,y_train = shuffle( X_train, y_train)
+        X_train,y_train = shuffle( X_train, y_train, shuffle_parts )
 
         val_err, val_loss = val_epoch( X_val, y_val, Layer_Masks = Masks )
 

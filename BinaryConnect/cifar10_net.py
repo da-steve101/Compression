@@ -21,6 +21,7 @@ import gzip
 
 import binary_net
 import batch_norm
+import cifar_model
 #sys.path.append('../../BinaryConnect/')
 import compress
 
@@ -39,15 +40,15 @@ def main(argv):
    parser.add_argument("percprune", type=float )
    parser.add_argument("--train", action="store_true")
    parser.add_argument("--prune", action="store_true")
-   parser.add_argument("--pruntype", nargs="?", choices=['activation', 'none'], default = "none")
+   parser.add_argument("--pruntype", nargs="?", choices=['random', 'quantization', 'real', 'activation', ''], default = "")
    parser.add_argument("--load", nargs="?")
    args = parser.parse_args()
 
    print(args)
-   
+
    if args.load is not None and args.train:
       parser.error("load requires train to be false")
-   
+
    print('Percentage Pruned is ', args.percprune)
    print('Pruning Type is ', args.pruntype)
    print('Prune Connections? ', args.prune)
@@ -60,36 +61,44 @@ if __name__ == "__main__":
 
     filter_percentage_prune, filter_pruning_type, prune, train, load = main(sys.argv[1:])
 
+    inputs = T.tensor4('inputs')
+    target = T.matrix('targets')
+    LR = T.scalar('LR', dtype=theano.config.floatX)
+    filter_sizes = [128,128,256,256,512,512]
+
+    my_model = cifar_model.Cifar_Model( inputs, target, filter_sizes )
+    my_model.LR = LR
+
     print(train)
     network_type = 'binarynet'
     # BN parameters
     batch_size = 50
     print("batch_size = "+str(batch_size))
     # alpha is the exponential moving average factor
-    alpha = .1
-    print("alpha = "+str(alpha))
-    epsilon = 1e-4
-    print("epsilon = "+str(epsilon))
+    my_model.alpha = .1
+    print("alpha = "+str(my_model.alpha))
+    my_model.epsilon = 1e-4
+    print("epsilon = "+str(my_model.epsilon))
 
     # BinaryOut
-    #activation = binary_net.HWGQ
-    activation = common.binary_tanh_unit
-    print("activation = common.binary_tanh_unit")
-    # activation = common.binary_sigmoid_unit
-    # print("activation = common.binary_sigmoid_unit")
+    #activation_fn = binary_net.HWGQ
+    my_model.activation_fn = common.binary_tanh_unit
+    print("activation_fn = common.binary_tanh_unit")
+    # activation_fn = common.binary_sigmoid_unit
+    # print("activation_fn = common.binary_sigmoid_unit")
 
     # BinaryConnect
-    binary = True
-    print("binary = "+str(binary))
-    stochastic = False
-    print("stochastic = "+str(stochastic))
+    my_model.binary = True
+    print("binary = "+str(my_model.binary))
+    my_model.stochastic = False
+    print("stochastic = "+str(my_model.stochastic))
     # (-H,+H) are the two binary values
     # H = "Glorot"
-    H = 1.
-    print("H = "+str(H))
+    my_model.H = 1.
+    print("H = "+str(my_model.H))
     # W_LR_scale = 1.
-    W_LR_scale = "Glorot" # "Glorot" means we are using the coefficients from Glorot's paper
-    print("W_LR_scale = "+str(W_LR_scale))
+    my_model.W_LR_scale = "Glorot" # "Glorot" means we are using the coefficients from Glorot's paper
+    print("W_LR_scale = "+str(my_model.W_LR_scale))
 
     # Training parameters
     num_epochs = 500
@@ -141,484 +150,12 @@ if __name__ == "__main__":
     print('Building the CNN...')
 
     # Prepare Theano variables for inputs and targets
-    input = T.tensor4('inputs')
-    target = T.matrix('targets')
-    LR = T.scalar('LR', dtype=theano.config.floatX)
+    cnn, activations, train_fn, val_fn, activ = my_model.build_model()
 
-    def build_model(numfilters1, numfilters2, numfilters3, numfilters4, numfilters5, numfilters6, binary=binary):
-        cnn = lasagne.layers.InputLayer(
-            shape=(None, 3, 32, 32),
-            input_var=input)
-
-        # 128C3-128C3-P2
-        cnn = common.Conv2DLayer(
-                cnn,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=numfilters1,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        act1 = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        activ = lasagne.layers.NonlinearityLayer(
-                act1,
-                nonlinearity=activation)
-
-        cnn = common.Conv2DLayer(
-                activ,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=numfilters2,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-
-        act2 = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                act2,
-                nonlinearity=activation)
-
-        # 256C3-256C3-P2
-        cnn = common.Conv2DLayer(
-                cnn,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=numfilters3,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        act3 = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                act3,
-                nonlinearity=activation)
-
-        cnn = common.Conv2DLayer(
-                cnn,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=numfilters4,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-
-        act4 = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                act4,
-                nonlinearity=activation)
-
-        # 512C3-512C3-P2
-        cnn = common.Conv2DLayer(
-                cnn,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=numfilters5,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        act5 = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                act5,
-                nonlinearity=activation)
-
-        cnn = common.Conv2DLayer(
-                cnn,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=numfilters6,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-
-        act6 = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                act6,
-                nonlinearity=activation)
-
-        # print(cnn.output_shape)
-
-        # 1024FP-1024FP-10FP
-        cnn = common.DenseLayer(
-                    cnn,
-                    binary=binary,
-                    stochastic=stochastic,
-                    H=H,
-                    W_LR_scale=W_LR_scale,
-                    nonlinearity=lasagne.nonlinearities.identity,
-                    num_units=1024)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        cnn = common.DenseLayer(
-                    cnn,
-                    binary=binary,
-                    stochastic=stochastic,
-                    H=H,
-                    W_LR_scale=W_LR_scale,
-                    nonlinearity=lasagne.nonlinearities.identity,
-                    num_units=1024)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        cnn = common.DenseLayer(
-                    cnn,
-                    binary=binary,
-                    stochastic=stochastic,
-                    H=H,
-                    W_LR_scale=W_LR_scale,
-                    nonlinearity=lasagne.nonlinearities.identity,
-                    num_units=10)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-        train_output = lasagne.layers.get_output(cnn, deterministic=False)
-        # squared hinge loss
-        loss = T.mean(T.sqr(T.maximum(0.,1.-target*train_output)))
-
-        if binary:
-
-            # W updates
-            W = lasagne.layers.get_all_params(cnn, binary=True)
-            W_grads = binary_net.compute_grads(loss,cnn)
-            updates = lasagne.updates.adam(loss_or_grads=W_grads, params=W, learning_rate=LR)
-            updates = binary_net.clipping_scaling(updates,cnn)
-
-            # other parameters updates
-            params = lasagne.layers.get_all_params(cnn, trainable=True, binary=False)
-            updates = OrderedDict(updates.items() + lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR).items())
-
-        else:
-            params = lasagne.layers.get_all_params(cnn, trainable=True)
-            updates = lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR)
-
-        test_output = lasagne.layers.get_output(cnn, deterministic=True)
-        test_loss = T.mean(T.sqr(T.maximum(0.,1.-target*test_output)))
-        test_err = T.mean(T.neq(T.argmax(test_output, axis=1), T.argmax(target, axis=1)),dtype=theano.config.floatX)
-
-        # Compile a function performing a training step on a mini-batch (by giving the updates dictionary)
-        # and returning the corresponding training loss:
-        train_fn = theano.function([input, target, LR], loss, updates=updates)
-
-        # Compile a second function computing the validation loss and accuracy:
-        val_fn = theano.function([input, target], [test_loss, test_err])
-
-        return cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ
-
-    def build_model_prune_and_L2(numfilters1, numfilters2, numfilters3, numfilters4, numfilters5, numfilters6, binary=binary):
-        Layer1_mask = T.ftensor4('Layer1_mask')
-        Layer2_mask = T.ftensor4('Layer2_mask')
-        Layer3_mask = T.ftensor4('Layer3_mask')
-        Layer4_mask = T.ftensor4('Layer4_mask')
-        Layer5_mask = T.ftensor4('Layer5_mask')
-        Layer6_mask = T.ftensor4('Layer6_mask')
-        Layer7_mask = T.fmatrix('Layer7_mask')
-        Layer8_mask = T.fmatrix('Layer8_mask')
-        Layer9_mask = T.fmatrix('Layer9_mask')
-
-        layer_masks = [ Layer1_mask, Layer2_mask,
-                        Layer3_mask, Layer4_mask,
-                        Layer5_mask, Layer6_mask,
-                        Layer7_mask, Layer8_mask,
-                        Layer9_mask ]
-        
-        cnn = lasagne.layers.InputLayer(
-                shape=(None, 3, 32, 32),
-                input_var=input)
-
-        # 128C3-128C3-P2
-        cnn = common.Conv2DLayer(
-                cnn,
-                Layer_mask=Layer1_mask,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=128,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        cnn = common.Conv2DLayer(
-                cnn,
-                Layer_mask=Layer2_mask,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=128,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        # 256C3-256C3-P2
-        cnn = common.Conv2DLayer(
-                cnn,
-                Layer_mask=Layer3_mask,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=256,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        cnn = common.Conv2DLayer(
-                cnn,
-                Layer_mask=Layer4_mask,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=256,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        # 512C3-512C3-P2
-        cnn = common.Conv2DLayer(
-                cnn,
-                Layer_mask=Layer5_mask,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=512,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        cnn = common.Conv2DLayer(
-                cnn,
-                Layer_mask=Layer6_mask,
-                binary=binary,
-                stochastic=stochastic,
-                H=H,
-                W_LR_scale=W_LR_scale,
-                num_filters=512,
-                filter_size=(3, 3),
-                pad=1,
-                nonlinearity=lasagne.nonlinearities.identity)
-
-        cnn = lasagne.layers.MaxPool2DLayer(cnn, pool_size=(2, 2))
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        # 1024FP-1024FP-10FP
-        cnn = common.DenseLayer(
-                    cnn,
-                    Layer_mask=Layer7_mask,
-                    binary=binary,
-                    stochastic=stochastic,
-                    H=H,
-                    W_LR_scale=W_LR_scale,
-                    nonlinearity=lasagne.nonlinearities.identity,
-                    num_units=1024)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        cnn = common.DenseLayer(
-                    cnn,
-                    Layer_mask=Layer8_mask,
-                    binary=binary,
-                    stochastic=stochastic,
-                    H=H,
-                    W_LR_scale=W_LR_scale,
-                    nonlinearity=lasagne.nonlinearities.identity,
-                    num_units=1024)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        cnn = lasagne.layers.NonlinearityLayer(
-                cnn,
-                nonlinearity=activation)
-
-        cnn = common.DenseLayer(
-                    cnn,
-                    Layer_mask=Layer9_mask,
-                    binary=binary,
-                    stochastic=stochastic,
-                    H=H,
-                    W_LR_scale=W_LR_scale,
-                    nonlinearity=lasagne.nonlinearities.identity,
-                    num_units=10)
-
-        cnn = lasagne.layers.BatchNormLayer(
-                cnn,
-                epsilon=epsilon,
-                alpha=alpha)
-
-        train_output = lasagne.layers.get_output(cnn, deterministic=False)
-
-        layers_NZ = lasagne.layers.get_all_layers(cnn)
-        # 1, 4, 8, 11, 15, 18, 22, 25, 28
-        L2_Regularization = sum([ lasagne.regularization.l2(layers_NZ[idx].Wb) for idx in [1, 4, 8, 11, 15, 18, 22, 25, 28 ] ])
-        HW = 0.00000000412*L2_Regularization
-
-        # squared hinge loss
-        loss = T.mean(T.sqr(T.maximum(0.,1.-target*train_output))) + HW
-
-        if binary:
-
-            # W updates
-            W = lasagne.layers.get_all_params(cnn, binary=True)
-            W_grads = binary_net.compute_grads( loss, cnn, layer_masks )
-            updates = lasagne.updates.adam(loss_or_grads=W_grads, params=W, learning_rate=LR)
-            updates = binary_net.clipping_scaling(updates,cnn)
-
-            # other parameters updates
-            params = lasagne.layers.get_all_params(cnn, trainable=True, binary=False)
-            updates = OrderedDict(updates.items() + lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR).items())
-
-        else:
-            params = lasagne.layers.get_all_params(cnn, trainable=True)
-            updates = lasagne.updates.adam(loss_or_grads=loss, params=params, learning_rate=LR)
-
-        test_output = lasagne.layers.get_output(cnn, deterministic=True)
-        test_loss = T.mean(T.sqr(T.maximum(0.,1.-target*test_output))) + HW
-        test_err = T.mean(T.neq(T.argmax(test_output, axis=1), T.argmax(target, axis=1)),dtype=theano.config.floatX)
-
-        # Compile a function performing a training step on a mini-batch (by giving the updates dictionary)
-        # and returning the corresponding training loss:
-        train_fn = theano.function([input, target, LR ] + layer_masks, loss, updates=updates)
-
-        # Compile a second function computing the validation loss and accuracy:
-        val_fn = theano.function([input, target ] + layer_masks, [test_loss, test_err])
-
-        return cnn, train_fn, val_fn
-
-    cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ = build_model(128,128,256,256,512,512)
-
-    activ_output = theano.function([input], [lasagne.layers.get_output(activ)])
+    activ_output = theano.function([inputs], [lasagne.layers.get_output(activ)])
 
     #train = False
-    if load != "":
+    if load is not None:
         cnn = compress.load_model(load, cnn)
         #cnn = compress.load_model('/home/jfar0131/job3/binarizedNet/cnnBA_binarized.save', cnn)
 
@@ -633,19 +170,14 @@ if __name__ == "__main__":
             validation_data = None
             func_activations = None
         else:
-            activations = [ lasagne.layers.get_output(act_i) for act_i in [act1, act2, act3, act4, act5, act6 ] ]
-            func_activations = [theano.function([input], [activations[idx]]) for idx in range(6) ]
+            activations = [ lasagne.layers.get_output(act_i) for act_i in activations ]
+            func_activations = [theano.function([inputs], [activations[idx]]) for idx in range(6) ]
             #make train True from command line argument and uncomment below if want to test activations pruning but dont want to train
             #train = False
         new_param_values, filter_sizes = compress.kernel_filter_pruning_functionality(
            filter_pruning_type, params_binary, param_values, filter_percentage_prune,
            network_type, validation_data, func_activations, batch_size)
-        cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ = build_model( filter_sizes[0],
-                                                                                        filter_sizes[1],
-                                                                                        filter_sizes[2],
-                                                                                        filter_sizes[3],
-                                                                                        filter_sizes[4],
-                                                                                        filter_sizes[5])
+        cnn, activations, train_fn, val_fn, activ = cifar_models.build_model()
         lasagne.layers.set_all_param_values(cnn, new_param_values)
     #train network with or without pruning
     print(train)
