@@ -631,7 +631,7 @@ if __name__ == "__main__":
 
     cnn, act1, act2, act3, act4, act5, act6, train_fn, val_fn, activ = build_model(128,128,256,256,512,512)
 
-    activ_output = theano.function([input], [lasagne.layers.get_output(activ)])
+    #activ_output = theano.function([input], [lasagne.layers.get_output(activ)])
 
     #train = False
     if load != "":
@@ -663,7 +663,7 @@ if __name__ == "__main__":
         if prune == False:
             binary_net.train(
                     train_fn,val_fn,
-                    cnn, filter_percentage_prune, filter_pruning_type, activ_output,
+                    cnn, filter_percentage_prune, filter_pruning_type, 
                     batch_size,
                     LR_start,LR_decay,
                     num_epochs,

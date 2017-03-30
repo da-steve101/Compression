@@ -43,19 +43,7 @@ def hard_sigmoid(x):
 # during back propagation
 def binary_tanh_unit(x):
     return 2*round3(hard_sigmoid(x)) - 1
-# q_2=1.
-# t_1=0.5
-# q_1=0.5
 
-# def Roof_ReLu(x):
-#     T.clip(x, 0, x)
-#     return T.clip(x,0,q_2)
-# def HWGQ(x):
-#     if (T.gt(x,0) and T.lt(x,q_2)):
-#         y=q_2*((round3(((Roof_ReLu(x) + (t_1))/q_2)-0.5)-t_1) + 0.5)
-#     else:
-#         y=round3(Roof_ReLu(x))
-#     return y
     
 def binary_sigmoid_unit(x):
     return round3(hard_sigmoid(x))
@@ -236,7 +224,7 @@ def clipping_scaling(updates,network):
 # Given a dataset and a model, this function trains the model on the dataset for several epochs
 # (There is no default trainer function in Lasagne yet)
 def train(train_fn,val_fn,
-            model, percentage_prune, pruning_type,activ_output,
+            model, percentage_prune, pruning_type,
             batch_size,
             LR_start,LR_decay,
             num_epochs,
@@ -298,7 +286,7 @@ def train(train_fn,val_fn,
         return loss
     
     # This function tests the model a full epoch (on the whole dataset)
-    def val_epoch(X,y, activ_output):
+    def val_epoch(X,y):
         
         err = 0
         loss = 0
@@ -306,8 +294,8 @@ def train(train_fn,val_fn,
         
         for i in range(batches):
             new_loss, new_err = val_fn(X[i*batch_size:(i+1)*batch_size], y[i*batch_size:(i+1)*batch_size])
-            if i ==0:
-                print(activ_output(X[i*batch_size:(i+1)*batch_size]))
+            # if i ==0:
+            #     print(activ_output(X[i*batch_size:(i+1)*batch_size]))
             err += new_err
             loss += new_loss
         
@@ -330,7 +318,8 @@ def train(train_fn,val_fn,
         train_loss = train_epoch(X_train,y_train,LR)
         X_train,y_train = shuffle(X_train,y_train)
         
-        val_err, val_loss = val_epoch(X_val,y_val, activ_output)
+        #val_err, val_loss = val_epoch(X_val,y_val, activ_output)
+        val_err, val_loss = val_epoch(X_val,y_val)
 
         # test if validation error went down
         if val_err <= best_val_err:
