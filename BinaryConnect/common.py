@@ -10,8 +10,11 @@ import lasagne
 
 import numpy as np
 
-def hard_sigmoid(x):
-    return T.clip((x+1.)/2.,0,1)
+use_trinary = True
+eta_val = 0.9
+
+def hard_sigmoid( x ):
+    return T.clip( ( x + 1 ) / 2., 0, 1 )
 
 class Round3(UnaryScalarOp):
 
@@ -40,75 +43,37 @@ def binary_sigmoid_unit(x):
     round3 = getRound3Elem()
     return round3(hard_sigmoid(x))
 
-# The binarization function
-def binarization(W,H,binary=True,deterministic=False,stochastic=False,srng=None):
-
+def binarizeORTrinarize( W, H, binary, deterministic, stochastic, srng, eta, is_ternary ):
     # (deterministic == True) <-> test-time <-> inference-time
     if not binary or (deterministic and stochastic):
-        # print("not binary")
-        Wb = W
+        return W
 
+    if is_ternary:
+        Wb = T.clip( W/H, -1, 1 )
     else:
-
         # [-1,1] -> [0,1]
         Wb = hard_sigmoid(W/H)
 
-        # Stochastic BinaryConnect
-        if stochastic:
+    # Stochastic BinaryConnect
+    if stochastic:
+        assert srng is not None, "srng argument is not provided"
+        return T.cast( srng.binomial( n = 1, p = Wb, size = T.shape(Wb) ), theano.config.floatX)
 
-            # print("stoch")
-            Wb = T.cast(srng.binomial(n=1, p=Wb, size=T.shape(Wb)), theano.config.floatX)
+    # else Deterministic
+    if is_ternary:
+        Wb = T.switch( T.gt( Wb, eta ), 1, Wb )
+        Wb = T.switch( T.lt( Wb, -eta ), -1, Wb )
+        return T.switch( T.ge( Wb, -eta ) & T.le( Wb, eta ), 0, Wb)
 
-        # Deterministic BinaryConnect (round to nearest)
-        else:
-            # print("det")
-            Wb = T.round(Wb)
-
-        # 0 or 1 -> -1 or 1
-        Wb = T.cast(T.switch(Wb,H,-H), theano.config.floatX)
-
-    return Wb
-
-# The weights' ternarization function,
-# taken directly from the BinaryConnect github repository
-# (which was made available by his authors)
-def ternarization(W,H,binary=True,deterministic=False,stochastic=False,srng=None):
-
-    # (deterministic == True) <-> test-time <-> inference-time
-    if not binary or (deterministic and stochastic):
-        # print("not binary")
-        Wb = W
-
-    else:
-
-        # [-1,1] -> [0,1]
-        Wb = hard_sigmoid(W/H)
-        # Wb = T.clip(W/H,-1,1)
-
-        # Stochastic BinaryConnect
-        if stochastic:
-
-            # print("stoch")
-            Wb = T.cast(srng.binomial(n=1, p=Wb, size=T.shape(Wb)), theano.config.floatX)
-
-        # Deterministic BinaryConnect (round to nearest)
-        else:
-            # print("det")
-            Wb = T.switch(T.gt(Wb,0.9), 1, Wb)
-            Wb = T.switch(T.lt(Wb,-0.9), -1, Wb)
-            Wb = T.switch(T.ge(Wb,-0.9) & T.le(Wb,0.9), 0, Wb)
-
-        # 0 or 1 -> -1 or 1
-        Wb = T.cast(T.switch(Wb,H,-H), theano.config.floatX)
-
-    return Wb
-
+    Wb = T.round(Wb)
+    # 0 or 1 -> -1 or 1
+    return T.cast( T.switch( Wb, H, -H ), theano.config.floatX )
 
 # This class extends the Lasagne DenseLayer to support BinaryConnect
 class DenseLayer(lasagne.layers.DenseLayer):
 
-    def __init__(self, incoming, num_units,
-        binary = True, stochastic = True, H=1.,W_LR_scale="Glorot", **kwargs): #kwargs represents aguemtns for uniform function and gett_output
+    def __init__(self, incoming, num_units, binary = True,
+                 stochastic = True, H=1., W_LR_scale="Glorot", **kwargs): #kwargs represents aguemtns for uniform function and gett_output
 
         self.binary = binary
         self.stochastic = stochastic
@@ -136,7 +101,9 @@ class DenseLayer(lasagne.layers.DenseLayer):
 
     def get_output_for(self, input, deterministic=False, **kwargs):
 
-        self.Wb = ternarization(self.W,self.H,self.binary,deterministic,self.stochastic,self._srng)
+        self.Wb = binarizeORTrinarize( self.W, self.H, self.binary, deterministic,
+                                       self.stochastic, self._srng, eta_val, use_trinary )
+
         Wr = self.W
         self.W = self.Wb
 
@@ -150,7 +117,8 @@ class DenseLayer(lasagne.layers.DenseLayer):
 class Conv2DLayer(lasagne.layers.Conv2DLayer):
 
     def __init__(self, incoming, num_filters, filter_size,
-        binary = True, stochastic = True, H=1.,W_LR_scale="Glorot", **kwargs):
+                 binary = True, stochastic = True, H=1.,
+                 W_LR_scale="Glorot", **kwargs):
 
         self.binary = binary
         self.stochastic = stochastic
@@ -180,7 +148,8 @@ class Conv2DLayer(lasagne.layers.Conv2DLayer):
 
     def convolve(self, input, deterministic=False, **kwargs):
 
-        self.Wb = ternarization( self.W, self.H, self.binary, deterministic, self.stochastic, self._srng )
+        self.Wb = binarizeORTrinarize( self.W, self.H, self.binary, deterministic,
+                                       self.stochastic, self._srng, eta_val, use_trinary )
         Wr = self.W
         self.W = self.Wb
 

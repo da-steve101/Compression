@@ -59,24 +59,19 @@ def binarize_cnn(param_values_binary, network_type):
         conv = param_values_binary[0:6]
         fc = param_values_binary[6:9]
 
-    count = 0
-
-    for i in conv:
+    for count, i in enumerate(conv):
         i = np.clip((i+1.)/2.,0.,1.)
         i = np.around(i)
         i = np.select([i<1., i>0.], [-1., 1.])
         i = i.astype(np.float32)
         conv[count] = i
-        count += 1
-    count = 0
 
-    for j in fc:
+    for count, j in enumerate(fc):
         j = np.clip((j+1.)/2.,0.,1.)
         j = np.around(j)
         j = np.select([j<1., j>0.], [-1., 1.])
         j = j.astype(np.float32)
         fc[count] = j
-        count +=1
 
     params_ternarized = conv + fc
 
@@ -254,7 +249,7 @@ def restructure_param_values(random, param_values, filters, network_type):
                         param_values[p+3] = np.delete(param_values[p+3], i-j,ax)
                         param_values[p+4] = np.delete(param_values[p+4], i-j,ax)
                         param_values[p+5] = np.delete(param_values[p+5], i-j,ax)
-                        param_values[p+6] = np.delete(param_values[p+6], [16*(i - j) + q for q in range(16) ] ,0)
+                        param_values[p+6] = np.delete(param_values[p+6], [16*(i - j) + q for q in range(16) ], 0)
                     j+=1
             for pv in param_values[p:p+6]:
                 print( pv.shape )
@@ -389,11 +384,11 @@ def random_pruning(param_values_binary, param_values,saved_filter_percentage, ne
             print(new_filter_sizes[i])
 
     for i in param_values_binary:
-    	print(i.shape)
+        print(i.shape)
     for i in param_values:
         print(i.shape)
 
-    param_values = restructure_param_values(random, param_values, filters, network_type)
+    param_values = restructure_param_values( random, param_values, filters, network_type )
 
     return param_values, new_filter_sizes
 

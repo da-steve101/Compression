@@ -177,7 +177,7 @@ if __name__ == "__main__":
         new_param_values, filter_sizes = compress.kernel_filter_pruning_functionality(
            filter_pruning_type, params_binary, param_values, filter_percentage_prune,
            network_type, validation_data, func_activations, batch_size)
-        cnn, activations, train_fn, val_fn, activ = cifar_models.build_model()
+        cnn, activations, train_fn, val_fn, activ = my_model.build_model()
         lasagne.layers.set_all_param_values(cnn, new_param_values)
     #train network with or without pruning
     print(train)
