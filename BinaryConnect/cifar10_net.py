@@ -152,7 +152,7 @@ if __name__ == "__main__":
     # Prepare Theano variables for inputs and targets
     cnn, activations, train_fn, val_fn, activ = my_model.build_model()
 
-    activ_output = theano.function([inputs], [lasagne.layers.get_output(activ)])
+    #activ_output = theano.function([input], [lasagne.layers.get_output(activ)])
 
     #train = False
     if load is not None:
@@ -186,7 +186,7 @@ if __name__ == "__main__":
         if prune == False:
             binary_net.train(
                     train_fn,val_fn,
-                    cnn, filter_percentage_prune, filter_pruning_type, activ_output,
+                    cnn, filter_percentage_prune, filter_pruning_type, 
                     batch_size,
                     LR_start,LR_decay,
                     num_epochs,
